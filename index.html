@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Paper Territory IO - 2D Grid Conquest Game</title>
+    <meta name="description" content="Paper Territory IO - Single-player Paper.io 2 web clone with AI rivals, territory capture engine, collision detection, and leaderboard database.">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&family=Outfit:wght@500;700;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Top Navigation Header -->
+        <header class="top-nav">
+            <div class="brand">
+                <div class="logo-icon"></div>
+                <h1>PAPER TERRITORY IO</h1>
+            </div>
+            <div class="nav-actions">
+                <button id="btn-pause" class="btn btn-secondary">⏸ Pause</button>
+                <button id="btn-restart" class="btn btn-primary">🔄 New Match (F2)</button>
+                <button id="btn-leaderboard" class="btn btn-accent">🏆 Leaderboard</button>
+                <button id="btn-help" class="btn btn-ghost">❓ Rules</button>
+            </div>
+        </header>
+
+        <!-- Main Game Layout -->
+        <main class="game-layout">
+            <!-- Canvas Area -->
+            <div class="canvas-wrapper">
+                <canvas id="gameCanvas" width="720" height="720"></canvas>
+                
+                <!-- Floating Start / Game Over Overlay -->
+                <div id="gameOverlay" class="overlay hidden">
+                    <div class="overlay-card glass-panel">
+                        <h2 id="overlayTitle">MATCH OVER</h2>
+                        <p id="overlaySubtitle">You captured 0.0% of the territory</p>
+                        <div id="overlayRankings" class="rankings-summary"></div>
+                        <div class="overlay-buttons">
+                            <button id="btn-overlay-play" class="btn btn-primary btn-lg">🎮 Play Again</button>
+                            <button id="btn-overlay-lb" class="btn btn-accent btn-lg">📊 View History</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Side HUD Panel -->
+            <aside class="hud-sidebar glass-panel">
+                <div class="hud-header">
+                    <div class="timer-box">
+                        <span class="label">MATCH TIME</span>
+                        <span id="matchTimer" class="timer-value">00:00</span>
+                    </div>
+                    <div id="matchStatus" class="status-badge status-active">LIVE MATCH</div>
+                </div>
+
+                <div class="section-title">
+                    <span>LIVE SCOREBOARD</span>
+                    <span id="aliveCount" class="badge">4 Alive</span>
+                </div>
+
+                <div id="scoreboardList" class="scoreboard-list">
+                    <!-- Dynamic Progress Cards -->
+                </div>
+
+                <div class="section-title">
+                    <span>LIVE EVENT TICKER</span>
+                </div>
+                <div id="eventTicker" class="event-ticker">
+                    <div class="log-entry system">> Match initialized with 3 AI Rivals.</div>
+                </div>
+
+                <!-- Live Demo Menu for Capstone Presentation -->
+                <div class="demo-section">
+                    <div class="demo-title">🎓 Presentation Demo Controls</div>
+                    <div class="demo-buttons">
+                        <button id="btn-demo-capture" class="btn btn-demo">⚡ Demo Capture</button>
+                        <button id="btn-demo-elim" class="btn btn-demo">💥 Demo Elimination</button>
+                    </div>
+                </div>
+            </aside>
+        </main>
+
+        <!-- Leaderboard & Database Modal -->
+        <div id="leaderboardModal" class="modal hidden">
+            <div class="modal-content glass-panel">
+                <div class="modal-header">
+                    <h2>🏆 JDBC & Web Match Records</h2>
+                    <button id="btn-close-lb" class="btn-close">&times;</button>
+                </div>
+                <div class="modal-tabs">
+                    <button id="tab-btn-top" class="tab-btn active">Top Territory Scores</button>
+                    <button id="tab-btn-history" class="tab-btn">Match History Log</button>
+                </div>
+                <div class="modal-body">
+                    <div id="tab-content-top" class="tab-content active">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Rank</th>
+                                    <th>Player Name</th>
+                                    <th>Type</th>
+                                    <th>Territory %</th>
+                                    <th>Claimed Cells</th>
+                                    <th>Eliminations</th>
+                                </tr>
+                            </thead>
+                            <tbody id="topScoresBody"></tbody>
+                        </table>
+                    </div>
+                    <div id="tab-content-history" class="tab-content">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Match ID</th>
+                                    <th>Timestamp</th>
+                                    <th>Duration</th>
+                                    <th>Winner</th>
+                                    <th>Human %</th>
+                                    <th>Rivals</th>
+                                </tr>
+                            </thead>
+                            <tbody id="historyBody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="btn-clear-db" class="btn btn-danger">Clear Database History</button>
+                    <button id="btn-close-modal" class="btn btn-secondary">Close</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rules Modal -->
+        <div id="rulesModal" class="modal hidden">
+            <div class="modal-content glass-panel">
+                <div class="modal-header">
+                    <h2>📜 Game Rules & Instructions</h2>
+                    <button id="btn-close-rules" class="btn-close">&times;</button>
+                </div>
+                <div class="modal-body rules-body">
+                    <ul>
+                        <li><strong>Draw Trails:</strong> Move outside your base color using <code>W A S D</code> or <code>Arrow Keys</code>.</li>
+                        <li><strong>Capture Land:</strong> Return safely to any part of your territory to claim all enclosed area.</li>
+                        <li><strong>Eliminate Rivals:</strong> Step on an opponent's glowing trail to eliminate them from the match.</li>
+                        <li><strong>Avoid Hazards:</strong> Do not hit map borders or run into your own trail!</li>
+                        <li><strong>Goal:</strong> Conquer the largest territory percentage on the map.</li>
+                    </ul>
+                </div>
+                <div class="modal-footer">
+                    <button id="btn-close-rules-modal" class="btn btn-primary">Got it!</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
