@@ -246,10 +246,18 @@ class PaperIOGame {
             });
         });
 
-        document.getElementById('btn-edit-profile')?.addEventListener('click', () => {
+        const openProfileEditor = () => {
             this.gameStarted = false;
             document.getElementById('startOverlay').classList.remove('hidden');
+            setTimeout(() => document.getElementById('playerNameInput')?.focus(), 100);
+        };
+
+        document.getElementById('btn-edit-profile')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openProfileEditor();
         });
+
+        document.querySelector('.profile-pill')?.addEventListener('click', openProfileEditor);
 
         // Start Game Overlay Button
         const startBtn = document.getElementById('btn-start-play');
