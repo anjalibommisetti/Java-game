@@ -236,6 +236,22 @@ class PaperIOGame {
             nameInput.addEventListener('input', (e) => {
                 this.saveProfile(e.target.value, null);
             });
+            nameInput.addEventListener('focus', () => {
+                nameInput.select();
+            });
+            nameInput.addEventListener('keydown', (e) => {
+                e.stopPropagation();
+            });
+        }
+
+        const clearBtn = document.getElementById('btn-clear-name');
+        if (clearBtn && nameInput) {
+            clearBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                nameInput.value = '';
+                nameInput.focus();
+                this.saveProfile('', null);
+            });
         }
 
         const colorBtns = document.querySelectorAll('.color-btn');

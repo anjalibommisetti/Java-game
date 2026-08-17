@@ -88,7 +88,10 @@
                     <h3>👤 Player Profile:</h3>
                     <div class="input-row">
                         <label for="playerNameInput">Nickname:</label>
-                        <input type="text" id="playerNameInput" placeholder="Enter Your Nickname" value="Player" maxlength="15" class="name-input">
+                        <div class="name-input-wrapper">
+                            <input type="text" id="playerNameInput" placeholder="Enter Your Nickname" value="Player" maxlength="15" class="name-input" autocomplete="off">
+                            <button type="button" id="btn-clear-name" class="btn-clear" title="Clear Text">✕</button>
+                        </div>
                     </div>
                     <div class="input-row">
                         <label>Skin Color:</label>

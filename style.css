@@ -141,21 +141,54 @@ body, html {
     margin-bottom: 10px;
 }
 
-.name-input {
+.name-input-wrapper {
+    position: relative;
     flex: 1;
-    padding: 8px 12px;
-    border: 2px solid #CBD5E1;
+    display: flex;
+    align-items: center;
+}
+
+.name-input {
+    width: 100%;
+    padding: 8px 32px 8px 12px;
+    background: #FFFFFF;
+    border: 2px solid #0284C7;
     border-radius: 10px;
     font-family: inherit;
     font-size: 1rem;
-    font-weight: 700;
-    color: #1E293B;
+    font-weight: 800;
+    color: #0F172A;
     outline: none;
-    transition: border-color 0.2s ease;
+    box-shadow: 0 2px 6px rgba(2, 132, 199, 0.15);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .name-input:focus {
-    border-color: #0284C7;
+    border-color: #0369A1;
+    box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.25);
+}
+
+.btn-clear {
+    position: absolute;
+    right: 8px;
+    background: #CBD5E1;
+    color: #475569;
+    border: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    font-size: 0.75rem;
+    font-weight: 900;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.btn-clear:hover {
+    background: #EF4444;
+    color: #FFFFFF;
 }
 
 .color-options {
