@@ -139,11 +139,19 @@ body, html {
     transform: scale(0.94);
 }
 
+.zoom-slider {
+    width: 90px;
+    height: 6px;
+    cursor: pointer;
+    accent-color: #0284C7;
+    border-radius: 4px;
+}
+
 .zoom-label {
     font-size: 0.85rem;
     font-weight: 800;
     color: #334155;
-    min-width: 36px;
+    min-width: 42px;
     text-align: center;
 }
 

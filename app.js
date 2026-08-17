@@ -49,7 +49,7 @@ class PaperIOGame {
 
         this.cameraX = 0;
         this.cameraY = 0;
-        this.zoomScale = 0.55; // Default zoomed out wide-angle full screen perspective
+        this.zoomScale = 0.35; // Default wide arena overview (35% scale)
         this.isPaused = false;
         this.isGameOver = false;
 
@@ -68,9 +68,12 @@ class PaperIOGame {
     }
 
     setZoom(scale) {
-        this.zoomScale = Math.min(1.2, Math.max(0.3, parseFloat(scale.toFixed(2))));
+        this.zoomScale = Math.min(1.5, Math.max(0.15, parseFloat(scale.toFixed(2))));
         const label = document.getElementById('zoomLabel');
-        if (label) label.textContent = `${Math.round(this.zoomScale * 100)}%`;
+        const slider = document.getElementById('zoomSlider');
+        const pct = Math.round(this.zoomScale * 100);
+        if (label) label.textContent = `${pct}%`;
+        if (slider) slider.value = pct;
     }
 
     resizeCanvas() {
@@ -176,16 +179,24 @@ class PaperIOGame {
         document.getElementById('btn-left')?.addEventListener('click', setLeft);
         document.getElementById('btn-right')?.addEventListener('click', setRight);
 
-        // Zoom In / Zoom Out Controls & Mouse Wheel Zoom
-        document.getElementById('btn-zoom-in')?.addEventListener('click', () => this.setZoom(this.zoomScale + 0.1));
-        document.getElementById('btn-zoom-out')?.addEventListener('click', () => this.setZoom(this.zoomScale - 0.1));
+        // Zoom Slider & Zoom Buttons & Mouse Wheel Zoom
+        const zoomSlider = document.getElementById('zoomSlider');
+        if (zoomSlider) {
+            zoomSlider.addEventListener('input', (e) => {
+                this.setZoom(parseFloat(e.target.value) / 100);
+            });
+        }
+        document.getElementById('btn-zoom-in')?.addEventListener('click', () => this.setZoom(this.zoomScale + 0.15));
+        document.getElementById('btn-zoom-out')?.addEventListener('click', () => this.setZoom(this.zoomScale - 0.15));
+        
         window.addEventListener('wheel', (e) => {
+            e.preventDefault();
             if (e.deltaY > 0) {
                 this.setZoom(this.zoomScale - 0.05);
             } else {
                 this.setZoom(this.zoomScale + 0.05);
             }
-        });
+        }, { passive: false });
 
         // Start Game Overlay Button
         const startBtn = document.getElementById('btn-start-play');
