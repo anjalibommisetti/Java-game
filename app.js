@@ -53,6 +53,7 @@ class PaperIOGame {
         this.isPaused = false;
         this.isGameOver = false;
         this.gameStarted = false; // Waiting for user to click PLAY GAME NOW
+        this.matchInitialized = false;
 
         this.elapsedSeconds = 0;
         this.lastStepTime = 0;
@@ -134,6 +135,7 @@ class PaperIOGame {
         this.isGameOver = false;
         this.isPaused = false;
         this.gameStarted = true;
+        this.matchInitialized = true;
         this.elapsedSeconds = 0;
 
         document.getElementById('gameOverlay').classList.add('hidden');
@@ -263,8 +265,19 @@ class PaperIOGame {
         const startBtn = document.getElementById('btn-start-play');
         if (startBtn) {
             startBtn.onclick = () => {
+                const nameInput = document.getElementById('playerNameInput');
+                const activeColorBtn = document.querySelector('.color-btn.active');
+                const val = nameInput ? nameInput.value : 'Player';
+                const col = activeColorBtn ? activeColorBtn.getAttribute('data-color') : null;
+
+                this.saveProfile(val, col);
                 document.getElementById('startOverlay').classList.add('hidden');
-                this.startNewMatch();
+
+                if (!this.matchInitialized) {
+                    this.startNewMatch();
+                } else {
+                    this.gameStarted = true;
+                }
             };
         }
 
