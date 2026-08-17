@@ -143,32 +143,40 @@ class PaperIOGame {
     }
 
     bindControls() {
+        // Keyboard Controls for User Player
         window.addEventListener('keydown', (e) => {
             if (!this.humanPlayer || !this.humanPlayer.isAlive) return;
             const key = e.key.toLowerCase();
-            if (key === 'arrowup' || key === 'w') { this.humanPlayer.vx = 0; this.humanPlayer.vy = -1; }
-            else if (key === 'arrowdown' || key === 's') { this.humanPlayer.vx = 0; this.humanPlayer.vy = 1; }
-            else if (key === 'arrowleft' || key === 'a') { this.humanPlayer.vx = -1; this.humanPlayer.vy = 0; }
-            else if (key === 'arrowright' || key === 'd') { this.humanPlayer.vx = 1; this.humanPlayer.vy = 0; }
-        });
-
-        // Mouse Steering Option
-        window.addEventListener('mousemove', (e) => {
-            if (!this.humanPlayer || !this.humanPlayer.isAlive) return;
-            let cx = window.innerWidth / 2;
-            let cy = window.innerHeight / 2;
-            let dx = e.clientX - cx;
-            let dy = e.clientY - cy;
-            if (Math.abs(dx) > 15 || Math.abs(dy) > 15) {
-                if (Math.abs(dx) > Math.abs(dy)) {
-                    this.humanPlayer.vx = dx > 0 ? 1 : -1;
-                    this.humanPlayer.vy = 0;
-                } else {
-                    this.humanPlayer.vx = 0;
-                    this.humanPlayer.vy = dy > 0 ? 1 : -1;
-                }
+            if (key === 'arrowup' || key === 'w') {
+                if (this.humanPlayer.vy !== 1) { this.humanPlayer.vx = 0; this.humanPlayer.vy = -1; }
+            } else if (key === 'arrowdown' || key === 's') {
+                if (this.humanPlayer.vy !== -1) { this.humanPlayer.vx = 0; this.humanPlayer.vy = 1; }
+            } else if (key === 'arrowleft' || key === 'a') {
+                if (this.humanPlayer.vx !== 1) { this.humanPlayer.vx = -1; this.humanPlayer.vy = 0; }
+            } else if (key === 'arrowright' || key === 'd') {
+                if (this.humanPlayer.vx !== -1) { this.humanPlayer.vx = 1; this.humanPlayer.vy = 0; }
             }
         });
+
+        // On-Screen D-Pad Controls for Mouse Click / Touch
+        const setUp = () => { if (this.humanPlayer && this.humanPlayer.vy !== 1) { this.humanPlayer.vx = 0; this.humanPlayer.vy = -1; } };
+        const setDown = () => { if (this.humanPlayer && this.humanPlayer.vy !== -1) { this.humanPlayer.vx = 0; this.humanPlayer.vy = 1; } };
+        const setLeft = () => { if (this.humanPlayer && this.humanPlayer.vx !== 1) { this.humanPlayer.vx = -1; this.humanPlayer.vy = 0; } };
+        const setRight = () => { if (this.humanPlayer && this.humanPlayer.vx !== -1) { this.humanPlayer.vx = 1; this.humanPlayer.vy = 0; } };
+
+        document.getElementById('btn-up')?.addEventListener('click', setUp);
+        document.getElementById('btn-down')?.addEventListener('click', setDown);
+        document.getElementById('btn-left')?.addEventListener('click', setLeft);
+        document.getElementById('btn-right')?.addEventListener('click', setRight);
+
+        // Start Game Overlay Button
+        const startBtn = document.getElementById('btn-start-play');
+        if (startBtn) {
+            startBtn.onclick = () => {
+                document.getElementById('startOverlay').classList.add('hidden');
+                this.startNewMatch();
+            };
+        }
 
         document.getElementById('btn-restart').onclick = () => this.startNewMatch();
         document.getElementById('btn-demo-capture').onclick = () => this.demoCapture();

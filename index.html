@@ -54,6 +54,38 @@
             <button id="btn-db-modal" class="btn-demo-sec">📊 JDBC Records</button>
         </div>
 
+        <!-- Bottom Center On-Screen Controls for Touch / Mouse Click -->
+        <div class="bottom-center-hud">
+            <div class="dpad">
+                <button id="btn-up" class="dpad-btn dpad-up">▲</button>
+                <div class="dpad-row">
+                    <button id="btn-left" class="dpad-btn dpad-left">◀</button>
+                    <button id="btn-down" class="dpad-btn dpad-down">▼</button>
+                    <button id="btn-right" class="dpad-btn dpad-right">▶</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Start Game Overlay -->
+        <div id="startOverlay" class="overlay">
+            <div class="overlay-card start-card">
+                <h1 style="color: #0284C7;">PAPER.IO 2</h1>
+                <p class="subtitle">Capture territory & eliminate rival AIs!</p>
+
+                <div class="control-instructions">
+                    <h3>🎮 Game Controls (Play by User):</h3>
+                    <p>• <b>Arrow Keys</b> or <b>WASD</b> to steer</p>
+                    <p>• <b>On-Screen Arrows</b> (Bottom Center) for touch/mouse click</p>
+                    <p>• Step outside your zone to draw a trail</p>
+                    <p>• Return home to claim full enclosed territory!</p>
+                </div>
+
+                <div class="overlay-actions">
+                    <button id="btn-start-play" class="btn-play">PLAY GAME NOW</button>
+                </div>
+            </div>
+        </div>
+
         <!-- Game Over / Victory Screen Overlay -->
         <div id="gameOverlay" class="overlay hidden">
             <div class="overlay-card">
