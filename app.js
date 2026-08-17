@@ -102,26 +102,28 @@ class PaperIOGame {
         this.updateProfileHUD();
     }
 
-    updateProfileHUD() {
+    updateProfileHUD(updateInput = true) {
         const nameInput = document.getElementById('playerNameInput');
         const hudName = document.getElementById('hudPlayerName');
         const hudDot = document.getElementById('hudColorDot');
 
-        if (nameInput) nameInput.value = this.humanPlayer.name;
-        if (hudName) hudName.textContent = this.humanPlayer.name;
+        const displayName = this.humanPlayer.name.trim() || 'Player';
+
+        if (updateInput && nameInput) nameInput.value = this.humanPlayer.name;
+        if (hudName) hudName.textContent = displayName;
         if (hudDot) hudDot.style.background = this.humanPlayer.color;
     }
 
-    saveProfile(name, color) {
-        const cleanName = name.trim() || 'Player';
-        this.humanPlayer.name = cleanName;
+    saveProfile(name, color, updateInput = true) {
+        this.humanPlayer.name = name;
         if (color) {
             this.humanPlayer.color = color;
             this.humanPlayer.territoryColor = color;
         }
-        localStorage.setItem('paperio_player_name', cleanName);
+        const saveName = name.trim() || 'Player';
+        localStorage.setItem('paperio_player_name', saveName);
         if (color) localStorage.setItem('paperio_player_color', color);
-        this.updateProfileHUD();
+        this.updateProfileHUD(updateInput);
     }
 
     startNewMatch() {
@@ -234,7 +236,7 @@ class PaperIOGame {
         const nameInput = document.getElementById('playerNameInput');
         if (nameInput) {
             nameInput.addEventListener('input', (e) => {
-                this.saveProfile(e.target.value, null);
+                this.saveProfile(e.target.value, null, false);
             });
             nameInput.addEventListener('focus', () => {
                 nameInput.select();
@@ -250,7 +252,7 @@ class PaperIOGame {
                 e.stopPropagation();
                 nameInput.value = '';
                 nameInput.focus();
-                this.saveProfile('', null);
+                this.saveProfile('', null, false);
             });
         }
 
@@ -260,7 +262,7 @@ class PaperIOGame {
                 colorBtns.forEach(b => b.classList.remove('active'));
                 btn.classList.add('active');
                 const selectedColor = btn.getAttribute('data-color');
-                this.saveProfile(this.humanPlayer.name, selectedColor);
+                this.saveProfile(this.humanPlayer.name, selectedColor, false);
             });
         });
 
@@ -283,10 +285,11 @@ class PaperIOGame {
             startBtn.onclick = () => {
                 const nameInput = document.getElementById('playerNameInput');
                 const activeColorBtn = document.querySelector('.color-btn.active');
-                const val = nameInput ? nameInput.value : 'Player';
+                let val = nameInput ? nameInput.value.trim() : '';
+                if (!val) val = 'Player';
                 const col = activeColorBtn ? activeColorBtn.getAttribute('data-color') : null;
 
-                this.saveProfile(val, col);
+                this.saveProfile(val, col, true);
                 document.getElementById('startOverlay').classList.add('hidden');
 
                 if (!this.matchInitialized) {
