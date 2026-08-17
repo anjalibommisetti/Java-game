@@ -43,6 +43,8 @@ public class TerritoryGridManager {
         lock.lock();
         try {
             player.setPosition(startX, startY);
+            player.setCurrentDirection(Direction.NONE);
+            player.setNextDirection(Direction.NONE);
             player.setOutside(false);
             player.setAlive(true);
             player.clearTrail();
