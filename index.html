@@ -16,11 +16,16 @@
         <!-- Main Fullscreen Game Canvas -->
         <canvas id="gameCanvas"></canvas>
 
-        <!-- Top Left Score Badges (Matching Image 2) -->
+        <!-- Top Left Score Badges & Profile -->
         <div class="top-left-hud">
+            <div class="profile-pill">
+                <span id="hudColorDot" class="color-dot" style="background: #00E5FF;"></span>
+                <span id="hudPlayerName" class="profile-name">Player</span>
+                <button id="btn-edit-profile" class="btn-edit-small" title="Edit Profile / Nickname">✏️ Edit</button>
+            </div>
             <div class="score-pill">
-                <div id="playerPctFill" class="score-fill" style="width: 25.18%;"></div>
-                <span id="playerPctText">25.18 %</span>
+                <div id="playerPctFill" class="score-fill" style="width: 0%;"></div>
+                <span id="playerPctText">0.00 %</span>
             </div>
             <div class="kills-pill">
                 <span class="skull-icon">💀</span>
@@ -78,12 +83,29 @@
                 <h1 style="color: #0284C7;">PAPER.IO 2</h1>
                 <p class="subtitle">Capture territory & eliminate rival AIs!</p>
 
+                <!-- Profile Customization Section -->
+                <div class="profile-editor">
+                    <h3>👤 Player Profile:</h3>
+                    <div class="input-row">
+                        <label for="playerNameInput">Nickname:</label>
+                        <input type="text" id="playerNameInput" placeholder="Enter Your Nickname" value="Player" maxlength="15" class="name-input">
+                    </div>
+                    <div class="input-row">
+                        <label>Skin Color:</label>
+                        <div class="color-options">
+                            <button type="button" class="color-btn active" data-color="#00E5FF" style="background: #00E5FF;" title="Cyan"></button>
+                            <button type="button" class="color-btn" data-color="#FF2D55" style="background: #FF2D55;" title="Neon Pink"></button>
+                            <button type="button" class="color-btn" data-color="#FFCC00" style="background: #FFCC00;" title="Gold Yellow"></button>
+                            <button type="button" class="color-btn" data-color="#00E676" style="background: #00E676;" title="Emerald Green"></button>
+                            <button type="button" class="color-btn" data-color="#AF52DE" style="background: #AF52DE;" title="Purple"></button>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="control-instructions">
-                    <h3>🎮 Game Controls (Play by User):</h3>
-                    <p>• <b>Arrow Keys</b> or <b>WASD</b> to steer</p>
-                    <p>• <b>On-Screen Arrows</b> (Bottom Center) for touch/mouse click</p>
-                    <p>• Step outside your zone to draw a trail</p>
-                    <p>• Return home to claim full enclosed territory!</p>
+                    <h3>🎮 Controls:</h3>
+                    <p>• <b>Arrow Keys / WASD</b> or <b>On-Screen Arrows</b> to steer</p>
+                    <p>• Step outside to draw a trail & return home to claim!</p>
                 </div>
 
                 <div class="overlay-actions">

@@ -84,7 +84,10 @@ class PaperIOGame {
     }
 
     setupPlayers() {
-        this.humanPlayer = new Player(1, "Player", false, "#00E5FF", "#DC2626", "#00E5FF");
+        const savedName = localStorage.getItem('paperio_player_name') || 'Player';
+        const savedColor = localStorage.getItem('paperio_player_color') || '#00E5FF';
+
+        this.humanPlayer = new Player(1, savedName, false, savedColor, "#DC2626", savedColor);
         this.players = [
             this.humanPlayer,
             new Player(2, "Estella", true, "#E040FB", "#C084FC", "#E040FB"),
@@ -94,6 +97,30 @@ class PaperIOGame {
             new Player(6, "Girl Brownie", true, "#AEEA00", "#BEF264", "#AEEA00"),
             new Player(7, "Dahlia", true, "#00E676", "#6EE7B7", "#00E676")
         ];
+
+        this.updateProfileHUD();
+    }
+
+    updateProfileHUD() {
+        const nameInput = document.getElementById('playerNameInput');
+        const hudName = document.getElementById('hudPlayerName');
+        const hudDot = document.getElementById('hudColorDot');
+
+        if (nameInput) nameInput.value = this.humanPlayer.name;
+        if (hudName) hudName.textContent = this.humanPlayer.name;
+        if (hudDot) hudDot.style.background = this.humanPlayer.color;
+    }
+
+    saveProfile(name, color) {
+        const cleanName = name.trim() || 'Player';
+        this.humanPlayer.name = cleanName;
+        if (color) {
+            this.humanPlayer.color = color;
+            this.humanPlayer.territoryColor = color;
+        }
+        localStorage.setItem('paperio_player_name', cleanName);
+        if (color) localStorage.setItem('paperio_player_color', color);
+        this.updateProfileHUD();
     }
 
     startNewMatch() {
@@ -200,6 +227,29 @@ class PaperIOGame {
                 this.setZoom(this.zoomScale + 0.05);
             }
         }, { passive: false });
+
+        // Profile Editor Listeners
+        const nameInput = document.getElementById('playerNameInput');
+        if (nameInput) {
+            nameInput.addEventListener('input', (e) => {
+                this.saveProfile(e.target.value, null);
+            });
+        }
+
+        const colorBtns = document.querySelectorAll('.color-btn');
+        colorBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                colorBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const selectedColor = btn.getAttribute('data-color');
+                this.saveProfile(this.humanPlayer.name, selectedColor);
+            });
+        });
+
+        document.getElementById('btn-edit-profile')?.addEventListener('click', () => {
+            this.gameStarted = false;
+            document.getElementById('startOverlay').classList.remove('hidden');
+        });
 
         // Start Game Overlay Button
         const startBtn = document.getElementById('btn-start-play');
