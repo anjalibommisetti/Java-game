@@ -28,18 +28,23 @@
             </div>
         </div>
 
-        <!-- Top Right Leaderboard & Coins (Matching Image 2) -->
+        <!-- Top Right Leaderboard & Coins & Zoom Controls -->
         <div class="top-right-hud">
             <div class="coins-badge">
                 <span id="coinsText">12,591</span>
                 <span class="coin-icon">🪙</span>
+            </div>
+            <div class="zoom-controls">
+                <button id="btn-zoom-out" class="btn-zoom" title="Zoom Out (Wide Arena View)">🔍 -</button>
+                <span id="zoomLabel" class="zoom-label">55%</span>
+                <button id="btn-zoom-in" class="btn-zoom" title="Zoom In">🔍 +</button>
             </div>
             <div id="leaderboardList" class="leaderboard-cards">
                 <!-- Dynamic Paper.io 2 Leaderboard Cards -->
             </div>
         </div>
 
-        <!-- Bottom Left Radar Minimap (Matching Image 2) -->
+        <!-- Bottom Left Radar Minimap -->
         <div class="bottom-left-hud">
             <div class="minimap-container">
                 <canvas id="minimapCanvas" width="120" height="120"></canvas>
@@ -47,11 +52,11 @@
             </div>
         </div>
 
-        <!-- Bottom Right Presentation Controls -->
+        <!-- Bottom Right Demo & JDBC Presentation Controls -->
         <div class="bottom-right-hud">
-            <button id="btn-demo-capture" class="btn-demo">⚡ Demo Capture</button>
-            <button id="btn-demo-elim" class="btn-demo">💥 Demo Kill</button>
-            <button id="btn-db-modal" class="btn-demo-sec">📊 JDBC Records</button>
+            <button id="btn-demo-capture" class="btn-demo" title="Capstone Presentation Demo">⚡ Demo Capture</button>
+            <button id="btn-demo-elim" class="btn-demo" title="Capstone Presentation Demo">💥 Demo Kill</button>
+            <button id="btn-db-modal" class="btn-demo-sec" title="View Match Database Records">📊 JDBC Records</button>
         </div>
 
         <!-- Bottom Center On-Screen Controls for Touch / Mouse Click -->

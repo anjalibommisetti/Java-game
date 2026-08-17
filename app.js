@@ -49,6 +49,7 @@ class PaperIOGame {
 
         this.cameraX = 0;
         this.cameraY = 0;
+        this.zoomScale = 0.55; // Default zoomed out wide-angle full screen perspective
         this.isPaused = false;
         this.isGameOver = false;
 
@@ -64,6 +65,12 @@ class PaperIOGame {
         this.startNewMatch();
 
         requestAnimationFrame((t) => this.loop(t));
+    }
+
+    setZoom(scale) {
+        this.zoomScale = Math.min(1.2, Math.max(0.3, parseFloat(scale.toFixed(2))));
+        const label = document.getElementById('zoomLabel');
+        if (label) label.textContent = `${Math.round(this.zoomScale * 100)}%`;
     }
 
     resizeCanvas() {
@@ -168,6 +175,17 @@ class PaperIOGame {
         document.getElementById('btn-down')?.addEventListener('click', setDown);
         document.getElementById('btn-left')?.addEventListener('click', setLeft);
         document.getElementById('btn-right')?.addEventListener('click', setRight);
+
+        // Zoom In / Zoom Out Controls & Mouse Wheel Zoom
+        document.getElementById('btn-zoom-in')?.addEventListener('click', () => this.setZoom(this.zoomScale + 0.1));
+        document.getElementById('btn-zoom-out')?.addEventListener('click', () => this.setZoom(this.zoomScale - 0.1));
+        window.addEventListener('wheel', (e) => {
+            if (e.deltaY > 0) {
+                this.setZoom(this.zoomScale - 0.05);
+            } else {
+                this.setZoom(this.zoomScale + 0.05);
+            }
+        });
 
         // Start Game Overlay Button
         const startBtn = document.getElementById('btn-start-play');
@@ -543,9 +561,9 @@ class PaperIOGame {
     }
 
     render() {
-        // Camera smooth follow
-        let targetCamX = this.humanPlayer.x * CELL_SIZE - this.canvas.width / 2;
-        let targetCamY = this.humanPlayer.y * CELL_SIZE - this.canvas.height / 2;
+        // Camera smooth follow centered on player cell
+        let targetCamX = this.humanPlayer.x * CELL_SIZE + CELL_SIZE / 2;
+        let targetCamY = this.humanPlayer.y * CELL_SIZE + CELL_SIZE / 2;
         this.cameraX += (targetCamX - this.cameraX) * 0.1;
         this.cameraY += (targetCamY - this.cameraY) * 0.1;
 
@@ -553,6 +571,9 @@ class PaperIOGame {
         this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
 
         this.ctx.save();
+        // Translate to center and apply zoom scale for full arena field-of-view
+        this.ctx.translate(this.canvas.width / 2, this.canvas.height / 2);
+        this.ctx.scale(this.zoomScale, this.zoomScale);
         this.ctx.translate(-this.cameraX, -this.cameraY);
 
         // 1. Render Map Boundary Border
