@@ -52,6 +52,7 @@ class PaperIOGame {
         this.zoomScale = 0.35; // Default wide arena overview (35% scale)
         this.isPaused = false;
         this.isGameOver = false;
+        this.gameStarted = false; // Waiting for user to click PLAY GAME NOW
 
         this.elapsedSeconds = 0;
         this.lastStepTime = 0;
@@ -63,6 +64,7 @@ class PaperIOGame {
         this.setupPlayers();
         this.bindControls();
         this.startNewMatch();
+        this.gameStarted = false; // Freeze match until user clicks PLAY GAME NOW
 
         requestAnimationFrame((t) => this.loop(t));
     }
@@ -104,6 +106,7 @@ class PaperIOGame {
 
         this.isGameOver = false;
         this.isPaused = false;
+        this.gameStarted = true;
         this.elapsedSeconds = 0;
 
         document.getElementById('gameOverlay').classList.add('hidden');
@@ -217,7 +220,7 @@ class PaperIOGame {
     loop(now) {
         requestAnimationFrame((t) => this.loop(t));
 
-        if (this.isPaused || this.isGameOver) {
+        if (!this.gameStarted || this.isPaused || this.isGameOver) {
             this.render();
             return;
         }
