@@ -157,7 +157,7 @@ class PaperIOGame {
             let s = spawns[idx % spawns.length];
             p.x = s.x;
             p.y = s.y;
-            p.vx = p.isAI ? 0 : 1; // Default human movement to Right so player is moving immediately
+            p.vx = 0; // Wait for key press before moving
             p.vy = 0;
             p.trail = [];
             p.isOutside = false;
