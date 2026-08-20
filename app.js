@@ -157,7 +157,7 @@ class PaperIOGame {
             let s = spawns[idx % spawns.length];
             p.x = s.x;
             p.y = s.y;
-            p.vx = 0;
+            p.vx = p.isAI ? 0 : 1; // Default human movement to Right so player is moving immediately
             p.vy = 0;
             p.trail = [];
             p.isOutside = false;
@@ -291,12 +291,7 @@ class PaperIOGame {
 
                 this.saveProfile(val, col, true);
                 document.getElementById('startOverlay').classList.add('hidden');
-
-                if (!this.matchInitialized) {
-                    this.startNewMatch();
-                } else {
-                    this.gameStarted = true;
-                }
+                this.startNewMatch();
             };
         }
 
@@ -305,6 +300,12 @@ class PaperIOGame {
         document.getElementById('btn-demo-elim').onclick = () => this.demoElimination();
         document.getElementById('btn-db-modal').onclick = () => this.openDBModal();
         document.getElementById('btn-close-modal').onclick = () => document.getElementById('dbModal').classList.add('hidden');
+        window.addEventListener('click', (e) => {
+            const dbModal = document.getElementById('dbModal');
+            if (e.target === dbModal) {
+                dbModal.classList.add('hidden');
+            }
+        });
     }
 
     loop(now) {
