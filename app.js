@@ -60,7 +60,7 @@ class PaperIOGame {
         this.elapsedSeconds = 0;
         this.lastStepTime = 0;
         this.lastTimerTick = 0;
-        this.stepDelay = 80; // Smooth tick rate
+        this.stepDelay = 60; // Faster, smooth tick rate (matches official Paper.io 2)
 
         this.resizeCanvas();
         window.addEventListener('resize', () => this.resizeCanvas());
@@ -164,8 +164,13 @@ class PaperIOGame {
             let s = spawns[idx % spawns.length];
             p.x = s.x;
             p.y = s.y;
-            p.vx = 0; // Wait for key press before moving
-            p.vy = 0;
+            if (p === this.humanPlayer) {
+                p.vx = 1; // Auto start moving right like official Paper.io 2
+                p.vy = 0;
+            } else {
+                p.vx = 0;
+                p.vy = 0;
+            }
             p.trail = [];
             p.isOutside = false;
             p.isAlive = true;
@@ -227,6 +232,31 @@ class PaperIOGame {
     }
 
     bindControls() {
+        // Mouse Cursor Steering Controls (Paper.io 2 Style)
+        window.addEventListener('mousemove', (e) => {
+            if (!this.humanPlayer || !this.humanPlayer.isAlive || this.isPaused || !this.gameStarted) return;
+            const centerX = window.innerWidth / 2;
+            const centerY = window.innerHeight / 2;
+            const dx = e.clientX - centerX;
+            const dy = e.clientY - centerY;
+
+            if (Math.abs(dx) > 20 || Math.abs(dy) > 20) {
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    const targetVx = dx > 0 ? 1 : -1;
+                    if (this.humanPlayer.vx !== -targetVx) {
+                        this.humanPlayer.vx = targetVx;
+                        this.humanPlayer.vy = 0;
+                    }
+                } else {
+                    const targetVy = dy > 0 ? 1 : -1;
+                    if (this.humanPlayer.vy !== -targetVy) {
+                        this.humanPlayer.vx = 0;
+                        this.humanPlayer.vy = targetVy;
+                    }
+                }
+            }
+        });
+
         // Keyboard Controls for User Player & Pause
         window.addEventListener('keydown', (e) => {
             const key = e.key.toLowerCase();
