@@ -569,6 +569,18 @@ class PaperIOGame {
         p.x = nx;
         p.y = ny;
 
+        // Check if player/AI steps on another player's active trail (TRAIL CUT ELIMINATION)
+        let existingTrailOwner = this.trailGrid[nx][ny];
+        if (existingTrailOwner > 0 && existingTrailOwner !== p.id) {
+            let victim = this.players.find(v => v.id === existingTrailOwner);
+            if (victim && victim.isAlive) {
+                victim.killedBy = p.name;
+                victim.deathReason = "trail cut";
+                p.kills++;
+                this.eliminatePlayer(victim, p, "trail cut");
+            }
+        }
+
         let currentOwner = this.grid[nx][ny];
 
         if (currentOwner !== p.id) {
