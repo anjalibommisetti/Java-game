@@ -704,6 +704,16 @@ class PaperIOGame {
 
     openDBModal() {
         let matches = JSON.parse(localStorage.getItem('paper_io_matches') || '[]');
+        if (matches.length === 0) {
+            // Provide default initial sample records if no matches played yet
+            matches = [
+                { id: 1, time: "12:45:10 PM", winner: "Player", pct: 14.85, duration: 42 },
+                { id: 2, time: "01:12:34 PM", winner: "Dahlia", pct: 9.12, duration: 35 },
+                { id: 3, time: "01:30:00 PM", winner: "Player", pct: 22.40, duration: 58 }
+            ];
+            localStorage.setItem('paper_io_matches', JSON.stringify(matches));
+        }
+
         let body = document.getElementById('dbHistoryBody');
         body.innerHTML = '';
         matches.forEach(m => {
@@ -711,8 +721,8 @@ class PaperIOGame {
                 <tr>
                     <td>#${m.id}</td>
                     <td>${m.time}</td>
-                    <td>${m.winner}</td>
-                    <td>${m.pct.toFixed(2)}%</td>
+                    <td><b>${m.winner}</b></td>
+                    <td><span style="color:#0284C7;font-weight:800;">${m.pct.toFixed(2)}%</span></td>
                     <td>${m.duration}s</td>
                 </tr>
             `;
@@ -722,24 +732,47 @@ class PaperIOGame {
 
     demoCapture() {
         if (!this.humanPlayer || !this.humanPlayer.isAlive) return;
-        let hx = this.humanPlayer.x, hy = this.humanPlayer.y;
-        for (let dx = 1; dx <= 6; dx++) {
-            if (this.isValid(hx + dx, hy)) {
-                this.humanPlayer.trail.push({ x: hx + dx, y: hy });
-                this.trailGrid[hx + dx][hy] = this.humanPlayer.id;
+        let pId = this.humanPlayer.id;
+        let hx = this.humanPlayer.x;
+        let hy = this.humanPlayer.y;
+
+        // Draw a large 10x10 enclosed loop around player
+        let size = 10;
+        let startX = Math.max(1, Math.min(GRID - size - 1, hx));
+        let startY = Math.max(1, Math.min(GRID - size - 1, hy));
+
+        for (let x = startX; x < startX + size; x++) {
+            for (let y = startY; y < startY + size; y++) {
+                if (this.isValid(x, y)) {
+                    this.grid[x][y] = pId;
+                    this.trailGrid[x][y] = 0;
+                }
             }
         }
-        this.performCapture(this.humanPlayer);
+
+        this.humanPlayer.trail = [];
+        this.humanPlayer.isOutside = false;
         this.updateStats();
         this.renderUI();
+
+        // Toast feedback
+        this.addKillToast(`⚡ <b>DEMO CAPTURE!</b> Enclosed +${(size * size / 100).toFixed(2)}% Territory!`);
     }
 
     demoElimination() {
         let ai = this.players.find(p => p.isAI && p.isAlive);
+        if (!ai) {
+            // Respawn an AI if all are dead
+            ai = this.players.find(p => p.isAI);
+            if (ai) ai.isAlive = true;
+        }
+
         if (ai) {
-            this.eliminatePlayer(ai, this.humanPlayer, "demo elimination");
+            this.humanPlayer.kills++;
+            this.eliminatePlayer(ai, this.humanPlayer, "Demo Kill");
             this.updateStats();
             this.renderUI();
+            this.addKillToast(`💥 <b>DEMO KILL!</b> You eliminated <b>${ai.name}</b>!`);
         }
     }
 
