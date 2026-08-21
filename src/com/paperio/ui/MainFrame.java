@@ -219,6 +219,8 @@ public class MainFrame extends JFrame implements CollisionEngine.CollisionEventL
         }
     }
 
+    private String humanPlayerDeathReason = "";
+
     @Override
     public void onPlayerEliminated(Player victim, Player killer, String reason) {
         hudPanel.addEventLog("ELIMINATION: " + reason);
@@ -228,8 +230,9 @@ public class MainFrame extends JFrame implements CollisionEngine.CollisionEventL
         hudPanel.updateHUD();
 
         if (victim == humanPlayer) {
+            humanPlayerDeathReason = reason;
             hudPanel.setGameStatus("YOU DIED!", Color.RED);
-            hudPanel.addEventLog("Game Over! You were eliminated.");
+            hudPanel.addEventLog("Game Over! You were eliminated: " + reason);
         }
 
         checkMatchEndCondition();
@@ -277,12 +280,19 @@ public class MainFrame extends JFrame implements CollisionEngine.CollisionEventL
 
     private void showGameOverDialog(String winnerName, List<Player> rankings) {
         StringBuilder sb = new StringBuilder();
+        if (!humanPlayer.isAlive()) {
+            sb.append("💀 CAUSE OF ELIMINATION:\n");
+            sb.append("   ").append(humanPlayerDeathReason.isEmpty() ? "You were eliminated!" : humanPlayerDeathReason).append("\n\n");
+        } else {
+            sb.append("🏆 VICTORY!\n   You conquered the arena & eliminated all rivals!\n\n");
+        }
         sb.append("Winner: ").append(winnerName).append("\n\n");
         sb.append("Final Territory Rankings:\n");
         int rank = 1;
         for (Player p : rankings) {
-            sb.append(String.format("%d. %s - %.2f%% (%d cells, %d kills)\n",
-                    rank++, p.getName(), p.getTerritoryPercentage(), p.getClaimedCount(), p.getKillCount()));
+            String status = p.isAlive() ? "" : " (Out)";
+            sb.append(String.format("%d. %s%s - %.2f%% (%d cells, %d kills)\n",
+                    rank++, p.getName(), status, p.getTerritoryPercentage(), p.getClaimedCount(), p.getKillCount()));
         }
 
         sb.append("\nResults have been persisted via JDBC to SQLite database.");

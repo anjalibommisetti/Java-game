@@ -427,6 +427,17 @@ class PaperIOGame {
             return false;
         }
 
+        // Head-to-Head Collision Check
+        for (let other of this.players) {
+            if (other.id !== movingPlayer.id && other.isAlive) {
+                if (other.x === nx && other.y === ny && movingPlayer.isOutside && other.isOutside) {
+                    this.eliminatePlayer(other, movingPlayer, "head-to-head collision");
+                    this.eliminatePlayer(movingPlayer, other, "head-to-head collision");
+                    return false;
+                }
+            }
+        }
+
         let trailOwnerId = this.trailGrid[nx][ny];
         if (trailOwnerId > 0) {
             let victim = this.players.find(p => p.id === trailOwnerId);
@@ -447,6 +458,8 @@ class PaperIOGame {
     eliminatePlayer(victim, killer, reason) {
         if (!victim.isAlive) return;
         victim.isAlive = false;
+        victim.deathReason = reason;
+        victim.killedBy = killer ? killer.name : null;
 
         for (let x = 0; x < GRID; x++) {
             for (let y = 0; y < GRID; y++) {
@@ -457,6 +470,29 @@ class PaperIOGame {
         victim.trail = [];
         victim.claimedCount = 0;
         victim.percentage = 0.0;
+
+        // Show live kill feed toast notification
+        let killMsg = "";
+        if (killer) {
+            killMsg = `💀 <b>${killer.name}</b> eliminated <b>${victim.name}</b> (${reason})`;
+        } else if (reason === "self-collision") {
+            killMsg = `⚠️ <b>${victim.name}</b> ran into their own trail!`;
+        } else if (reason === "crashed into map border") {
+            killMsg = `🧱 <b>${victim.name}</b> crashed into the map border!`;
+        } else {
+            killMsg = `💀 <b>${victim.name}</b> was eliminated!`;
+        }
+        this.addKillToast(killMsg);
+    }
+
+    addKillToast(message) {
+        const feed = document.getElementById('killFeed');
+        if (!feed) return;
+        const toast = document.createElement('div');
+        toast.className = 'kill-toast';
+        toast.innerHTML = message;
+        feed.appendChild(toast);
+        setTimeout(() => toast.remove(), 3500);
     }
 
     updateAIMovement(ai) {
@@ -593,19 +629,61 @@ class PaperIOGame {
 
     checkGameOver() {
         if (this.isGameOver) return;
-        if (!this.humanPlayer.isAlive) {
+
+        let aliveAIs = this.players.filter(p => p.isAI && p.isAlive).length;
+        let humanDead = !this.humanPlayer.isAlive;
+        let humanWon = !humanDead && aliveAIs === 0;
+
+        if (humanDead || humanWon) {
             this.isGameOver = true;
             let sorted = [...this.players].sort((a, b) => b.percentage - a.percentage);
             let winner = sorted[0].name;
 
             this.saveMatchToJDBC(winner, sorted);
 
-            document.getElementById('overlayTitle').textContent = "YOU DIED";
-            document.getElementById('overlaySubtitle').textContent = `Conquered ${this.humanPlayer.percentage.toFixed(2)}% of the arena`;
+            const titleElem = document.getElementById('overlayTitle');
+            const subtitleElem = document.getElementById('overlaySubtitle');
+            const reasonElem = document.getElementById('overlayDeathReason');
+
+            if (humanWon) {
+                if (titleElem) titleElem.textContent = "VICTORY!";
+                if (titleElem) titleElem.style.color = "#10B981";
+                if (subtitleElem) subtitleElem.textContent = `You conquered ${this.humanPlayer.percentage.toFixed(2)}% of the arena & eliminated all rivals!`;
+                if (reasonElem) {
+                    reasonElem.innerHTML = `🏆 <b>1st Place Winner!</b>`;
+                    reasonElem.style.background = "#ECFDF5";
+                    reasonElem.style.color = "#059669";
+                    reasonElem.style.borderColor = "#6EE7B7";
+                }
+            } else {
+                if (titleElem) titleElem.textContent = "YOU DIED";
+                if (titleElem) titleElem.style.color = "#FF1744";
+                if (subtitleElem) subtitleElem.textContent = `Conquered ${this.humanPlayer.percentage.toFixed(2)}% of the arena`;
+
+                if (reasonElem) {
+                    let text = "";
+                    if (this.humanPlayer.killedBy) {
+                        text = `💀 Killed by <strong style="color: #0F172A; margin: 0 4px;">${this.humanPlayer.killedBy}</strong> (${this.humanPlayer.deathReason || 'Trail Cut'})`;
+                    } else if (this.humanPlayer.deathReason === "self-collision") {
+                        text = `⚠️ Ran into your own trail!`;
+                    } else if (this.humanPlayer.deathReason === "crashed into map border") {
+                        text = `🧱 Crashed into the map boundary!`;
+                    } else if (this.humanPlayer.deathReason === "head-to-head collision") {
+                        text = `💥 Head-to-head collision!`;
+                    } else {
+                        text = `💀 ${this.humanPlayer.deathReason || 'Eliminated'}`;
+                    }
+                    reasonElem.innerHTML = text;
+                    reasonElem.style.background = "#FEF2F2";
+                    reasonElem.style.color = "#DC2626";
+                    reasonElem.style.borderColor = "#FCA5A5";
+                }
+            }
 
             let html = ``;
             sorted.forEach((p, idx) => {
-                html += `<div>#${idx + 1} ${p.name} - ${p.percentage.toFixed(2)}% (${p.kills} kills)</div>`;
+                let badge = !p.isAlive ? ` <span style="color:#94A3B8;font-size:0.8rem;">(Out)</span>` : '';
+                html += `<div>#${idx + 1} ${p.name}${badge} - ${p.percentage.toFixed(2)}% (${p.kills} kills)</div>`;
             });
             document.getElementById('overlayRankings').innerHTML = html;
             document.getElementById('gameOverlay').classList.remove('hidden');
