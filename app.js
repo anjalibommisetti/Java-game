@@ -439,26 +439,48 @@ class PaperIOGame {
     updateAIMovement(ai) {
         let isOwner = (this.grid[ai.x][ai.y] === ai.id);
 
+        // 1. Boundary Wall Avoidance (Steer away if approaching map borders)
+        const wallMargin = 5;
+        if (ai.x <= wallMargin && ai.vx < 0) { ai.vx = 0; ai.vy = ai.y > GRID / 2 ? -1 : 1; return; }
+        if (ai.x >= GRID - wallMargin && ai.vx > 0) { ai.vx = 0; ai.vy = ai.y > GRID / 2 ? -1 : 1; return; }
+        if (ai.y <= wallMargin && ai.vy < 0) { ai.vy = 0; ai.vx = ai.x > GRID / 2 ? -1 : 1; return; }
+        if (ai.y >= GRID - wallMargin && ai.vy > 0) { ai.vy = 0; ai.vx = ai.x > GRID / 2 ? -1 : 1; return; }
+
+        // 2. Excursion Control
         if (!ai.isOutside && isOwner) {
-            // Inside home base: venture out in a random cardinal direction
+            // Inside home base: venture out in a safe cardinal direction
             let dirs = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }];
-            let choice = dirs[Math.floor(Math.random() * dirs.length)];
-            ai.vx = choice.x;
-            ai.vy = choice.y;
-            ai.aiExcursion = 0;
+            // Filter directions that don't immediately hit a wall
+            dirs = dirs.filter(d => this.isValid(ai.x + d.x * 4, ai.y + d.y * 4));
+            if (dirs.length > 0) {
+                let choice = dirs[Math.floor(Math.random() * dirs.length)];
+                ai.vx = choice.x;
+                ai.vy = choice.y;
+                ai.aiExcursion = 0;
+            }
         } else if (ai.isOutside) {
             ai.aiExcursion++;
+
             if (ai.aiExcursion >= ai.aiMaxExcursion) {
-                // Return towards home base
+                // Time to turn back towards home base
                 this.steerAITowardsHome(ai);
-            } else if (Math.random() < 0.25) {
-                // Turn 90 degrees occasionally to make square/rectangle loops
+            } else if (Math.random() < 0.15) {
+                // Turn 90 degrees safely (avoiding immediate 180-degree self-collisions)
+                let candVx = 0, candVy = 0;
                 if (ai.vx !== 0) {
-                    ai.vy = Math.random() < 0.5 ? 1 : -1;
-                    ai.vx = 0;
+                    candVy = Math.random() < 0.5 ? 1 : -1;
+                    candVx = 0;
                 } else {
-                    ai.vx = Math.random() < 0.5 ? 1 : -1;
-                    ai.vy = 0;
+                    candVx = Math.random() < 0.5 ? 1 : -1;
+                    candVy = 0;
+                }
+
+                // Check target cell is valid and NOT own trail
+                let tx = ai.x + candVx;
+                let ty = ai.y + candVy;
+                if (this.isValid(tx, ty) && this.trailGrid[tx][ty] !== ai.id) {
+                    ai.vx = candVx;
+                    ai.vy = candVy;
                 }
             }
         }
@@ -468,8 +490,8 @@ class PaperIOGame {
         // Find closest owned territory cell for AI
         let bestDist = 999;
         let target = null;
-        for (let x = 0; x < GRID; x += 3) {
-            for (let y = 0; y < GRID; y += 3) {
+        for (let x = 0; x < GRID; x += 4) {
+            for (let y = 0; y < GRID; y += 4) {
                 if (this.grid[x][y] === ai.id) {
                     let d = Math.abs(x - ai.x) + Math.abs(y - ai.y);
                     if (d < bestDist) {
@@ -483,12 +505,22 @@ class PaperIOGame {
         if (target) {
             let dx = target.x - ai.x;
             let dy = target.y - ai.y;
+
+            let candVx = 0, candVy = 0;
             if (Math.abs(dx) > Math.abs(dy)) {
-                ai.vx = dx > 0 ? 1 : -1;
-                ai.vy = 0;
+                candVx = dx > 0 ? 1 : -1;
+                candVy = 0;
             } else {
-                ai.vy = dy > 0 ? 1 : -1;
-                ai.vx = 0;
+                candVy = dy > 0 ? 1 : -1;
+                candVx = 0;
+            }
+
+            // Verify steer target doesn't walk straight into own trail
+            let tx = ai.x + candVx;
+            let ty = ai.y + candVy;
+            if (this.isValid(tx, ty) && this.trailGrid[tx][ty] !== ai.id) {
+                ai.vx = candVx;
+                ai.vy = candVy;
             }
         }
     }
@@ -649,6 +681,43 @@ class PaperIOGame {
             msg = `💀 <b>${victim.name}</b> was eliminated (${reason})`;
         }
         this.addKillToast(msg);
+
+        // Schedule AI respawn after 6 seconds to keep map populated
+        if (victim.isAI && !this.isGameOver) {
+            setTimeout(() => {
+                if (!this.isGameOver && !victim.isAlive) {
+                    this.respawnAI(victim);
+                }
+            }, 6000);
+        }
+    }
+
+    respawnAI(ai) {
+        let rx = 15 + Math.floor(Math.random() * (GRID - 30));
+        let ry = 15 + Math.floor(Math.random() * (GRID - 30));
+
+        ai.x = rx;
+        ai.y = ry;
+        ai.vx = 0;
+        ai.vy = 0;
+        ai.trail = [];
+        ai.isOutside = false;
+        ai.isAlive = true;
+        ai.aiExcursion = 0;
+
+        // Spawn new 5x5 base
+        for (let dx = -2; dx <= 2; dx++) {
+            for (let dy = -2; dy <= 2; dy++) {
+                let tx = rx + dx;
+                let ty = ry + dy;
+                if (this.isValid(tx, ty)) {
+                    this.grid[tx][ty] = ai.id;
+                }
+            }
+        }
+        this.updateStats();
+        this.renderUI();
+        this.addKillToast(`🤖 <b>${ai.name}</b> respawned!`);
     }
 
     addKillToast(text) {
