@@ -58,11 +58,11 @@
             </div>
         </div>
 
-        <!-- Bottom Right Demo & JDBC Presentation Controls -->
+        <!-- Bottom Right Feature & Rewards Controls -->
         <div class="bottom-right-hud">
-            <button id="btn-demo-capture" class="btn-demo" title="Capstone Presentation Demo">⚡ Demo Capture</button>
-            <button id="btn-demo-elim" class="btn-demo" title="Capstone Presentation Demo">💥 Demo Kill</button>
-            <button id="btn-db-modal" class="btn-demo-sec" title="View Match Database Records">📊 JDBC Records</button>
+            <button id="btn-daily-reward" class="btn-demo" title="Claim Free Daily Reward Coins">🎁 Daily Reward</button>
+            <button id="btn-speed-boost" class="btn-demo" title="Activate Temporary Speed Boost">⚡ Speed Boost</button>
+            <button id="btn-db-modal" class="btn-demo-sec" title="View Saved Match Records">📊 Match Records</button>
         </div>
 
         <!-- Bottom Center On-Screen Controls for Touch / Mouse Click -->
@@ -130,6 +130,20 @@
                 <div class="overlay-actions">
                     <button id="btn-restart" class="btn-play">PLAY AGAIN</button>
                 </div>
+            </div>
+        </div>
+
+        <!-- Daily Reward Gift Modal -->
+        <div id="rewardModal" class="modal hidden">
+            <div class="modal-card reward-card" style="text-align: center; gap: 14px; width: 360px;">
+                <div style="font-size: 3.5rem; animation: bounce 1s infinite alternate;">🎁</div>
+                <h2 style="color: #0F172A; font-size: 1.8rem; font-weight: 900;">Daily Gift Reward!</h2>
+                <p style="color: #475569; font-size: 1rem; font-weight: 700;">Claim your daily bonus reward:</p>
+                <div style="background: #FEF3C7; border: 2px dashed #F59E0B; padding: 14px; border-radius: 16px; font-weight: 900; font-size: 1.25rem; color: #B45309;">
+                    🪙 +1,000 GOLD COINS<br>
+                    <span style="font-size: 0.9rem; color: #0284C7; font-weight: 800;">⚡ 10s Speed Surge Boost</span>
+                </div>
+                <button id="btn-claim-reward" class="btn-play" style="background: linear-gradient(135deg, #F59E0B, #D97706); margin-top: 6px;">CLAIM REWARD 🎉</button>
             </div>
         </div>
 

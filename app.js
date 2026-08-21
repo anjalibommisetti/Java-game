@@ -296,15 +296,23 @@ class PaperIOGame {
         }
 
         document.getElementById('btn-restart').onclick = () => this.startNewMatch();
-        document.getElementById('btn-demo-capture').onclick = () => this.demoCapture();
-        document.getElementById('btn-demo-elim').onclick = () => this.demoElimination();
+        document.getElementById('btn-daily-reward')?.addEventListener('click', () => {
+            document.getElementById('rewardModal').classList.remove('hidden');
+        });
+        document.getElementById('btn-claim-reward')?.addEventListener('click', () => {
+            document.getElementById('rewardModal').classList.add('hidden');
+            this.claimDailyReward();
+        });
+        document.getElementById('btn-speed-boost')?.addEventListener('click', () => {
+            this.activateSpeedBoost();
+        });
         document.getElementById('btn-db-modal').onclick = () => this.openDBModal();
         document.getElementById('btn-close-modal').onclick = () => document.getElementById('dbModal').classList.add('hidden');
         window.addEventListener('click', (e) => {
             const dbModal = document.getElementById('dbModal');
-            if (e.target === dbModal) {
-                dbModal.classList.add('hidden');
-            }
+            const rewardModal = document.getElementById('rewardModal');
+            if (e.target === dbModal) dbModal.classList.add('hidden');
+            if (e.target === rewardModal) rewardModal.classList.add('hidden');
         });
     }
 
@@ -730,50 +738,27 @@ class PaperIOGame {
         document.getElementById('dbModal').classList.remove('hidden');
     }
 
-    demoCapture() {
-        if (!this.humanPlayer || !this.humanPlayer.isAlive) return;
-        let pId = this.humanPlayer.id;
-        let hx = this.humanPlayer.x;
-        let hy = this.humanPlayer.y;
-
-        // Draw a large 10x10 enclosed loop around player
-        let size = 10;
-        let startX = Math.max(1, Math.min(GRID - size - 1, hx));
-        let startY = Math.max(1, Math.min(GRID - size - 1, hy));
-
-        for (let x = startX; x < startX + size; x++) {
-            for (let y = startY; y < startY + size; y++) {
-                if (this.isValid(x, y)) {
-                    this.grid[x][y] = pId;
-                    this.trailGrid[x][y] = 0;
-                }
-            }
+    claimDailyReward() {
+        const coinsElem = document.getElementById('coinsText');
+        let currentCoins = 12591;
+        if (coinsElem) {
+            let parsed = parseInt(coinsElem.textContent.replace(/,/g, ''), 10);
+            if (!isNaN(parsed)) currentCoins = parsed;
+            currentCoins += 1000;
+            coinsElem.textContent = currentCoins.toLocaleString();
         }
-
-        this.humanPlayer.trail = [];
-        this.humanPlayer.isOutside = false;
-        this.updateStats();
-        this.renderUI();
-
-        // Toast feedback
-        this.addKillToast(`⚡ <b>DEMO CAPTURE!</b> Enclosed +${(size * size / 100).toFixed(2)}% Territory!`);
+        this.addKillToast(`🎁 <b>DAILY REWARD CLAIMED!</b> +1,000 Gold Coins added! 🎉`);
+        this.activateSpeedBoost(10);
     }
 
-    demoElimination() {
-        let ai = this.players.find(p => p.isAI && p.isAlive);
-        if (!ai) {
-            // Respawn an AI if all are dead
-            ai = this.players.find(p => p.isAI);
-            if (ai) ai.isAlive = true;
-        }
-
-        if (ai) {
-            this.humanPlayer.kills++;
-            this.eliminatePlayer(ai, this.humanPlayer, "Demo Kill");
-            this.updateStats();
-            this.renderUI();
-            this.addKillToast(`💥 <b>DEMO KILL!</b> You eliminated <b>${ai.name}</b>!`);
-        }
+    activateSpeedBoost(seconds = 6) {
+        this.stepDelay = 40; // Double speed tick rate (40ms instead of 80ms)
+        this.addKillToast(`⚡ <b>SPEED SURGE ACTIVATED!</b> 2x Speed for ${seconds}s!`);
+        if (this.speedTimer) clearTimeout(this.speedTimer);
+        this.speedTimer = setTimeout(() => {
+            this.stepDelay = 80;
+            this.addKillToast(`⏱️ Speed boost expired.`);
+        }, seconds * 1000);
     }
 
     render() {
