@@ -30,6 +30,8 @@ class Player {
         this.aiTarget = null;
         this.aiExcursion = 0;
         this.aiMaxExcursion = 10;
+        this.deathReason = "";
+        this.killedBy = "";
     }
 }
 
@@ -57,6 +59,7 @@ class PaperIOGame {
 
         this.elapsedSeconds = 0;
         this.lastStepTime = 0;
+        this.lastTimerTick = 0;
         this.stepDelay = 80; // Smooth tick rate
 
         this.resizeCanvas();
@@ -66,6 +69,7 @@ class PaperIOGame {
         this.bindControls();
         this.startNewMatch();
         this.gameStarted = false; // Freeze match until user clicks PLAY GAME NOW
+        document.getElementById('startOverlay').classList.remove('hidden');
 
         requestAnimationFrame((t) => this.loop(t));
     }
@@ -139,8 +143,11 @@ class PaperIOGame {
         this.gameStarted = true;
         this.matchInitialized = true;
         this.elapsedSeconds = 0;
+        this.lastTimerTick = performance.now();
 
         document.getElementById('gameOverlay').classList.add('hidden');
+        document.getElementById('pauseOverlay').classList.add('hidden');
+        document.getElementById('startOverlay').classList.add('hidden');
 
         // Spawn Locations evenly distributed
         const spawns = [
@@ -163,6 +170,8 @@ class PaperIOGame {
             p.isOutside = false;
             p.isAlive = true;
             p.kills = 0;
+            p.deathReason = "";
+            p.killedBy = "";
             p.aiExcursion = 0;
             p.aiMaxExcursion = 8 + Math.floor(Math.random() * 8);
 
@@ -180,6 +189,37 @@ class PaperIOGame {
 
         this.updateStats();
         this.renderUI();
+        this.addKillToast(`🎮 <b>Match Started!</b> Conquer the arena!`);
+    }
+
+    showStartOverlay() {
+        this.gameStarted = false;
+        this.isPaused = false;
+        document.getElementById('gameOverlay').classList.add('hidden');
+        document.getElementById('pauseOverlay').classList.add('hidden');
+        document.getElementById('startOverlay').classList.remove('hidden');
+    }
+
+    pauseGame() {
+        if (!this.gameStarted || this.isGameOver) return;
+        this.isPaused = true;
+        document.getElementById('pauseOverlay').classList.remove('hidden');
+        this.addKillToast(`⏸ <b>Game Paused</b>`);
+    }
+
+    resumeGame() {
+        this.isPaused = false;
+        this.lastTimerTick = performance.now();
+        document.getElementById('pauseOverlay').classList.add('hidden');
+        this.addKillToast(`▶ <b>Resumed Match!</b>`);
+    }
+
+    togglePause() {
+        if (this.isPaused) {
+            this.resumeGame();
+        } else {
+            this.pauseGame();
+        }
     }
 
     isValid(x, y) {
@@ -187,10 +227,16 @@ class PaperIOGame {
     }
 
     bindControls() {
-        // Keyboard Controls for User Player
+        // Keyboard Controls for User Player & Pause
         window.addEventListener('keydown', (e) => {
-            if (!this.humanPlayer || !this.humanPlayer.isAlive) return;
             const key = e.key.toLowerCase();
+            if (key === 'p' || key === 'escape') {
+                this.togglePause();
+                return;
+            }
+
+            if (!this.humanPlayer || !this.humanPlayer.isAlive || this.isPaused) return;
+
             if (key === 'arrowup' || key === 'w') {
                 if (this.humanPlayer.vy !== 1) { this.humanPlayer.vx = 0; this.humanPlayer.vy = -1; }
             } else if (key === 'arrowdown' || key === 's') {
@@ -203,15 +249,22 @@ class PaperIOGame {
         });
 
         // On-Screen D-Pad Controls for Mouse Click / Touch
-        const setUp = () => { if (this.humanPlayer && this.humanPlayer.vy !== 1) { this.humanPlayer.vx = 0; this.humanPlayer.vy = -1; } };
-        const setDown = () => { if (this.humanPlayer && this.humanPlayer.vy !== -1) { this.humanPlayer.vx = 0; this.humanPlayer.vy = 1; } };
-        const setLeft = () => { if (this.humanPlayer && this.humanPlayer.vx !== 1) { this.humanPlayer.vx = -1; this.humanPlayer.vy = 0; } };
-        const setRight = () => { if (this.humanPlayer && this.humanPlayer.vx !== -1) { this.humanPlayer.vx = 1; this.humanPlayer.vy = 0; } };
+        const setUp = () => { if (this.humanPlayer && this.humanPlayer.vy !== 1 && !this.isPaused) { this.humanPlayer.vx = 0; this.humanPlayer.vy = -1; } };
+        const setDown = () => { if (this.humanPlayer && this.humanPlayer.vy !== -1 && !this.isPaused) { this.humanPlayer.vx = 0; this.humanPlayer.vy = 1; } };
+        const setLeft = () => { if (this.humanPlayer && this.humanPlayer.vx !== 1 && !this.isPaused) { this.humanPlayer.vx = -1; this.humanPlayer.vy = 0; } };
+        const setRight = () => { if (this.humanPlayer && this.humanPlayer.vx !== -1 && !this.isPaused) { this.humanPlayer.vx = 1; this.humanPlayer.vy = 0; } };
 
         document.getElementById('btn-up')?.addEventListener('click', setUp);
         document.getElementById('btn-down')?.addEventListener('click', setDown);
         document.getElementById('btn-left')?.addEventListener('click', setLeft);
         document.getElementById('btn-right')?.addEventListener('click', setRight);
+
+        // HUD Pause & Resume & Menu Buttons
+        document.getElementById('btn-pause-hud')?.addEventListener('click', () => this.pauseGame());
+        document.getElementById('btn-resume-game')?.addEventListener('click', () => this.resumeGame());
+        document.getElementById('btn-restart-paused')?.addEventListener('click', () => this.startNewMatch());
+        document.getElementById('btn-main-menu-paused')?.addEventListener('click', () => this.showStartOverlay());
+        document.getElementById('btn-main-menu-gameover')?.addEventListener('click', () => this.showStartOverlay());
 
         // Zoom Slider & Zoom Buttons & Mouse Wheel Zoom
         const zoomSlider = document.getElementById('zoomSlider');
@@ -222,8 +275,9 @@ class PaperIOGame {
         }
         document.getElementById('btn-zoom-in')?.addEventListener('click', () => this.setZoom(this.zoomScale + 0.15));
         document.getElementById('btn-zoom-out')?.addEventListener('click', () => this.setZoom(this.zoomScale - 0.15));
-        
+
         window.addEventListener('wheel', (e) => {
+            if (e.target.closest('#dbModal') || e.target.closest('#gameOverlay') || e.target.closest('#startOverlay')) return;
             e.preventDefault();
             if (e.deltaY > 0) {
                 this.setZoom(this.zoomScale - 0.05);
@@ -234,8 +288,12 @@ class PaperIOGame {
 
         // Profile Editor Listeners
         const nameInput = document.getElementById('playerNameInput');
+        const validationMsg = document.getElementById('nameValidationMsg');
+
         if (nameInput) {
             nameInput.addEventListener('input', (e) => {
+                nameInput.classList.remove('input-error');
+                if (validationMsg) validationMsg.classList.add('hidden');
                 this.saveProfile(e.target.value, null, false);
             });
             nameInput.addEventListener('focus', () => {
@@ -279,18 +337,27 @@ class PaperIOGame {
 
         document.querySelector('.profile-pill')?.addEventListener('click', openProfileEditor);
 
-        // Start Game Overlay Button
+        // Start Game Button with Nickname Validation
         const startBtn = document.getElementById('btn-start-play');
         if (startBtn) {
             startBtn.onclick = () => {
-                const nameInput = document.getElementById('playerNameInput');
+                const inputElem = document.getElementById('playerNameInput');
+                const val = inputElem ? inputElem.value.trim() : '';
+
+                if (!val) {
+                    if (inputElem) inputElem.classList.add('input-error');
+                    if (validationMsg) validationMsg.classList.remove('hidden');
+                    if (inputElem) inputElem.focus();
+                    return;
+                }
+
+                if (inputElem) inputElem.classList.remove('input-error');
+                if (validationMsg) validationMsg.classList.add('hidden');
+
                 const activeColorBtn = document.querySelector('.color-btn.active');
-                let val = nameInput ? nameInput.value.trim() : '';
-                if (!val) val = 'Player';
                 const col = activeColorBtn ? activeColorBtn.getAttribute('data-color') : null;
 
                 this.saveProfile(val, col, true);
-                document.getElementById('startOverlay').classList.add('hidden');
                 this.startNewMatch();
             };
         }
@@ -308,6 +375,7 @@ class PaperIOGame {
         });
         document.getElementById('btn-db-modal').onclick = () => this.openDBModal();
         document.getElementById('btn-close-modal').onclick = () => document.getElementById('dbModal').classList.add('hidden');
+        
         window.addEventListener('click', (e) => {
             const dbModal = document.getElementById('dbModal');
             const rewardModal = document.getElementById('rewardModal');
@@ -319,155 +387,250 @@ class PaperIOGame {
     loop(now) {
         requestAnimationFrame((t) => this.loop(t));
 
-        if (!this.gameStarted || this.isPaused || this.isGameOver) {
-            this.render();
-            return;
+        if (!this.lastStepTime) this.lastStepTime = now;
+        const delta = now - this.lastStepTime;
+
+        // Timer Tick Increment (Every 1 second when active & not paused)
+        if (this.gameStarted && !this.isPaused && !this.isGameOver) {
+            if (now - this.lastTimerTick >= 1000) {
+                this.elapsedSeconds++;
+                this.lastTimerTick = now;
+                this.updateTimerDisplay();
+            }
         }
 
-        if (now - this.lastStepTime > this.stepDelay) {
+        if (delta >= this.stepDelay && this.gameStarted && !this.isPaused && !this.isGameOver) {
             this.lastStepTime = now;
-            this.updateStep();
+            this.updateGameLogic();
         }
 
         this.render();
     }
 
-    updateStep() {
-        this.players.forEach(p => {
-            if (!p.isAlive) return;
+    updateTimerDisplay() {
+        const timerElem = document.getElementById('gameTimeText');
+        if (!timerElem) return;
+        const mins = Math.floor(this.elapsedSeconds / 60);
+        const secs = this.elapsedSeconds % 60;
+        const fmtMins = mins < 10 ? `0${mins}` : `${mins}`;
+        const fmtSecs = secs < 10 ? `0${secs}` : `${secs}`;
+        timerElem.textContent = `${fmtMins}:${fmtSecs}`;
+    }
 
-            if (p.isAI) {
-                this.updateAIMovement(p);
-            }
+    updateGameLogic() {
+        // 1. Move Human Player
+        if (this.humanPlayer.isAlive && (this.humanPlayer.vx !== 0 || this.humanPlayer.vy !== 0)) {
+            this.movePlayer(this.humanPlayer);
+        }
 
-            if (p.vx === 0 && p.vy === 0) return;
-
-            let nx = p.x + p.vx;
-            let ny = p.y + p.vy;
-
-            // Collision check
-            if (!this.checkCollisions(p, nx, ny)) return;
-
-            p.x = nx;
-            p.y = ny;
-
-            // Check territory state
-            if (this.grid[nx][ny] !== p.id) {
-                p.isOutside = true;
-                p.trail.push({ x: nx, y: ny });
-                this.trailGrid[nx][ny] = p.id;
-                p.aiExcursion++;
-            } else {
-                if (p.isOutside) {
-                    // Safe Return -> ENCLOSURE CAPTURE!
-                    this.performCapture(p);
-                    p.aiExcursion = 0;
-                    p.aiMaxExcursion = 8 + Math.floor(Math.random() * 8);
-                }
-            }
+        // 2. AI Movement Logic
+        this.players.filter(p => p.isAI && p.isAlive).forEach(ai => {
+            this.updateAIMovement(ai);
+            this.movePlayer(ai);
         });
 
+        // 3. Collision Checks & Game Over Evaluation
+        this.checkCollisions();
         this.updateStats();
         this.renderUI();
         this.checkGameOver();
     }
 
-    performCapture(player) {
-        let pId = player.id;
+    updateAIMovement(ai) {
+        let isOwner = (this.grid[ai.x][ai.y] === ai.id);
 
-        // Convert trail to owned territory
-        player.trail.forEach(pt => {
+        if (!ai.isOutside && isOwner) {
+            // Inside home base: venture out in a random cardinal direction
+            let dirs = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }];
+            let choice = dirs[Math.floor(Math.random() * dirs.length)];
+            ai.vx = choice.x;
+            ai.vy = choice.y;
+            ai.aiExcursion = 0;
+        } else if (ai.isOutside) {
+            ai.aiExcursion++;
+            if (ai.aiExcursion >= ai.aiMaxExcursion) {
+                // Return towards home base
+                this.steerAITowardsHome(ai);
+            } else if (Math.random() < 0.25) {
+                // Turn 90 degrees occasionally to make square/rectangle loops
+                if (ai.vx !== 0) {
+                    ai.vy = Math.random() < 0.5 ? 1 : -1;
+                    ai.vx = 0;
+                } else {
+                    ai.vx = Math.random() < 0.5 ? 1 : -1;
+                    ai.vy = 0;
+                }
+            }
+        }
+    }
+
+    steerAITowardsHome(ai) {
+        // Find closest owned territory cell for AI
+        let bestDist = 999;
+        let target = null;
+        for (let x = 0; x < GRID; x += 3) {
+            for (let y = 0; y < GRID; y += 3) {
+                if (this.grid[x][y] === ai.id) {
+                    let d = Math.abs(x - ai.x) + Math.abs(y - ai.y);
+                    if (d < bestDist) {
+                        bestDist = d;
+                        target = { x, y };
+                    }
+                }
+            }
+        }
+
+        if (target) {
+            let dx = target.x - ai.x;
+            let dy = target.y - ai.y;
+            if (Math.abs(dx) > Math.abs(dy)) {
+                ai.vx = dx > 0 ? 1 : -1;
+                ai.vy = 0;
+            } else {
+                ai.vy = dy > 0 ? 1 : -1;
+                ai.vx = 0;
+            }
+        }
+    }
+
+    movePlayer(p) {
+        let nx = p.x + p.vx;
+        let ny = p.y + p.vy;
+
+        // Wall Border Collision
+        if (!this.isValid(nx, ny)) {
+            p.deathReason = "crashed into map border";
+            this.eliminatePlayer(p, null, "crashed into map border");
+            return;
+        }
+
+        p.x = nx;
+        p.y = ny;
+
+        let currentOwner = this.grid[nx][ny];
+
+        if (currentOwner !== p.id) {
+            // Player is outside home territory drawing a trail
+            p.isOutside = true;
+
+            // Self-Collision (stepping on own trail)
+            if (this.trailGrid[nx][ny] === p.id) {
+                p.deathReason = "self-collision";
+                this.eliminatePlayer(p, p, "self-collision");
+                return;
+            }
+
+            p.trail.push({ x: nx, y: ny });
+            this.trailGrid[nx][ny] = p.id;
+        } else {
+            // Player returned safely to home territory -> Capture Enclosed Area!
+            if (p.isOutside) {
+                this.performCapture(p);
+                p.isOutside = false;
+                p.trail = [];
+            }
+        }
+    }
+
+    performCapture(p) {
+        let pId = p.id;
+        let prevPct = p.percentage;
+
+        // 1. Convert active trail to owned territory
+        p.trail.forEach(pt => {
             this.grid[pt.x][pt.y] = pId;
             this.trailGrid[pt.x][pt.y] = 0;
         });
 
-        // BFS Flood fill from perimeter
+        // 2. Perimeter BFS Flood Fill to capture enclosed area
         let visited = Array(GRID).fill(false).map(() => Array(GRID).fill(false));
         let queue = [];
 
+        // Push map borders into BFS queue if not owned by player
         for (let x = 0; x < GRID; x++) {
-            this.pushSeed(x, 0, pId, visited, queue);
-            this.pushSeed(x, GRID - 1, pId, visited, queue);
+            if (this.grid[x][0] !== pId) { visited[x][0] = true; queue.push({ x, y: 0 }); }
+            if (this.grid[x][GRID - 1] !== pId) { visited[x][GRID - 1] = true; queue.push({ x: x, y: GRID - 1 }); }
         }
         for (let y = 0; y < GRID; y++) {
-            this.pushSeed(0, y, pId, visited, queue);
-            this.pushSeed(GRID - 1, y, pId, visited, queue);
+            if (this.grid[0][y] !== pId) { visited[0][y] = true; queue.push({ x: 0, y }); }
+            if (this.grid[GRID - 1][y] !== pId) { visited[GRID - 1][y] = true; queue.push({ x: GRID - 1, y }); }
         }
 
-        const dx = [0, 0, 1, -1];
-        const dy = [1, -1, 0, 0];
-
+        // BFS traversal for all exterior uncaptured cells
         while (queue.length > 0) {
             let curr = queue.shift();
-            for (let i = 0; i < 4; i++) {
-                let nx = curr.x + dx[i];
-                let ny = curr.y + dy[i];
-                if (this.isValid(nx, ny) && !visited[nx][ny] && this.grid[nx][ny] !== pId) {
-                    visited[nx][ny] = true;
-                    queue.push({ x: nx, y: ny });
+            let dirs = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }];
+            dirs.forEach(d => {
+                let tx = curr.x + d.x;
+                let ty = curr.y + d.y;
+                if (this.isValid(tx, ty) && !visited[tx][ty] && this.grid[tx][ty] !== pId) {
+                    visited[tx][ty] = true;
+                    queue.push({ x: tx, y: ty });
                 }
-            }
+            });
         }
 
-        // Claim all enclosed unvisited cells
+        // 3. Any cell not visited by exterior flood fill is enclosed -> Claim it!
+        let newlyClaimed = 0;
         for (let x = 0; x < GRID; x++) {
             for (let y = 0; y < GRID; y++) {
-                if (!visited[x][y] && this.grid[x][y] !== pId) {
+                if (!visited[x][y]) {
+                    if (this.grid[x][y] !== pId) newlyClaimed++;
                     this.grid[x][y] = pId;
+                    this.trailGrid[x][y] = 0;
                 }
             }
         }
 
-        player.trail = [];
-        player.isOutside = false;
-    }
-
-    pushSeed(x, y, pId, visited, queue) {
-        if (!visited[x][y] && this.grid[x][y] !== pId) {
-            visited[x][y] = true;
-            queue.push({ x, y });
+        this.updateStats();
+        let gainedPct = (p.percentage - prevPct).toFixed(2);
+        if (p === this.humanPlayer && gainedPct > 0.1) {
+            this.addKillToast(`✨ <b>Captured +${gainedPct}% Territory!</b>`);
         }
     }
 
-    checkCollisions(movingPlayer, nx, ny) {
-        if (!this.isValid(nx, ny)) {
-            this.eliminatePlayer(movingPlayer, null, "crashed into map border");
-            return false;
-        }
+    checkCollisions() {
+        this.players.filter(p => p.isAlive).forEach(p => {
+            // Check Head-to-Head Collisions
+            this.players.filter(other => other.isAlive && other.id !== p.id).forEach(other => {
+                if (p.x === other.x && p.y === other.y) {
+                    if (p.isOutside && !other.isOutside) {
+                        p.deathReason = "head-to-head collision";
+                        this.eliminatePlayer(p, other, "head-to-head collision");
+                    } else if (!p.isOutside && other.isOutside) {
+                        other.deathReason = "head-to-head collision";
+                        this.eliminatePlayer(other, p, "head-to-head collision");
+                    } else {
+                        p.deathReason = "head-to-head collision";
+                        this.eliminatePlayer(p, other, "head-to-head collision");
+                    }
+                }
+            });
 
-        // Head-to-Head Collision Check
-        for (let other of this.players) {
-            if (other.id !== movingPlayer.id && other.isAlive) {
-                if (other.x === nx && other.y === ny && movingPlayer.isOutside && other.isOutside) {
-                    this.eliminatePlayer(other, movingPlayer, "head-to-head collision");
-                    this.eliminatePlayer(movingPlayer, other, "head-to-head collision");
-                    return false;
+            // Check Trail Cutting Collisions
+            let trailOwnerId = this.trailGrid[p.x][p.y];
+            if (trailOwnerId > 0 && trailOwnerId !== p.id) {
+                let victim = this.players.find(v => v.id === trailOwnerId);
+                if (victim && victim.isAlive) {
+                    victim.killedBy = p.name;
+                    victim.deathReason = "trail cut";
+                    p.kills++;
+                    this.eliminatePlayer(victim, p, "trail cut");
                 }
             }
-        }
-
-        let trailOwnerId = this.trailGrid[nx][ny];
-        if (trailOwnerId > 0) {
-            let victim = this.players.find(p => p.id === trailOwnerId);
-            if (victim && victim.isAlive) {
-                if (victim.id === movingPlayer.id) {
-                    this.eliminatePlayer(movingPlayer, null, "self-collision");
-                    return false;
-                } else {
-                    movingPlayer.kills++;
-                    this.eliminatePlayer(victim, movingPlayer, "trail cut");
-                }
-            }
-        }
-
-        return true;
+        });
     }
 
-    eliminatePlayer(victim, killer, reason) {
-        if (!victim.isAlive) return;
+    eliminatePlayer(victim, attacker, reason) {
         victim.isAlive = false;
-        victim.deathReason = reason;
-        victim.killedBy = killer ? killer.name : null;
+        victim.vx = 0;
+        victim.vy = 0;
+
+        // Clear victim's territory and active trail
+        victim.trail.forEach(pt => {
+            this.trailGrid[pt.x][pt.y] = 0;
+        });
+        victim.trail = [];
 
         for (let x = 0; x < GRID; x++) {
             for (let y = 0; y < GRID; y++) {
@@ -475,156 +638,104 @@ class PaperIOGame {
                 if (this.trailGrid[x][y] === victim.id) this.trailGrid[x][y] = 0;
             }
         }
-        victim.trail = [];
-        victim.claimedCount = 0;
-        victim.percentage = 0.0;
 
-        // Show live kill feed toast notification
-        let killMsg = "";
-        if (killer) {
-            killMsg = `💀 <b>${killer.name}</b> eliminated <b>${victim.name}</b> (${reason})`;
-        } else if (reason === "self-collision") {
-            killMsg = `⚠️ <b>${victim.name}</b> ran into their own trail!`;
-        } else if (reason === "crashed into map border") {
-            killMsg = `🧱 <b>${victim.name}</b> crashed into the map border!`;
+        // Live Feed Kill Toast Feedback
+        let msg = "";
+        if (attacker && attacker !== victim) {
+            msg = `💀 <b>${attacker.name}</b> eliminated <b>${victim.name}</b> (${reason})`;
+        } else if (victim === this.humanPlayer) {
+            msg = `⚠️ <b>YOU DIED:</b> ${reason}`;
         } else {
-            killMsg = `💀 <b>${victim.name}</b> was eliminated!`;
+            msg = `💀 <b>${victim.name}</b> was eliminated (${reason})`;
         }
-        this.addKillToast(killMsg);
+        this.addKillToast(msg);
     }
 
-    addKillToast(message) {
+    addKillToast(text) {
         const feed = document.getElementById('killFeed');
         if (!feed) return;
+
         const toast = document.createElement('div');
         toast.className = 'kill-toast';
-        toast.innerHTML = message;
+        toast.innerHTML = text;
+
         feed.appendChild(toast);
-        setTimeout(() => toast.remove(), 3500);
-    }
 
-    updateAIMovement(ai) {
-        let validDirs = [
-            { x: 0, y: -1 },
-            { x: 0, y: 1 },
-            { x: -1, y: 0 },
-            { x: 1, y: 0 }
-        ].filter(d => {
-            if (d.x === -ai.vx && d.y === -ai.vy && (ai.vx !== 0 || ai.vy !== 0)) return false;
-            let tx = ai.x + d.x;
-            let ty = ai.y + d.y;
-            return this.isValid(tx, ty) && this.trailGrid[tx][ty] !== ai.id;
-        });
-
-        if (validDirs.length === 0) return;
-
-        // Head towards home base if outside for long
-        if (ai.isOutside && ai.aiExcursion >= ai.aiMaxExcursion) {
-            let best = validDirs[0];
-            let minDist = 9999;
-            validDirs.forEach(d => {
-                let tx = ai.x + d.x, ty = ai.y + d.y;
-                let dist = this.distToHome(tx, ty, ai.id);
-                if (dist < minDist) {
-                    minDist = dist;
-                    best = d;
-                }
-            });
-            ai.vx = best.x;
-            ai.vy = best.y;
-            return;
-        }
-
-        // Keep current direction if valid
-        let curValid = validDirs.find(d => d.x === ai.vx && d.y === ai.vy);
-        if (curValid && Math.random() > 0.25) return;
-
-        let picked = validDirs[Math.floor(Math.random() * validDirs.length)];
-        ai.vx = picked.x;
-        ai.vy = picked.y;
-    }
-
-    distToHome(x, y, pId) {
-        if (this.grid[x][y] === pId) return 0;
-        let minDist = 9999;
-        for (let dx = -8; dx <= 8; dx++) {
-            for (let dy = -8; dy <= 8; dy++) {
-                let tx = x + dx, ty = y + dy;
-                if (this.isValid(tx, ty) && this.grid[tx][ty] === pId) {
-                    let d = dx * dx + dy * dy;
-                    if (d < minDist) minDist = d;
-                }
+        setTimeout(() => {
+            if (toast && toast.parentNode) {
+                toast.parentNode.removeChild(toast);
             }
-        }
-        return minDist;
+        }, 3500);
     }
 
     updateStats() {
-        let total = GRID * GRID;
-        let counts = {};
-        this.players.forEach(p => counts[p.id] = 0);
-
-        for (let x = 0; x < GRID; x++) {
-            for (let y = 0; y < GRID; y++) {
-                let owner = this.grid[x][y];
-                if (owner > 0 && counts[owner] !== undefined) counts[owner]++;
-            }
-        }
-
+        let totalCells = GRID * GRID;
         this.players.forEach(p => {
-            p.claimedCount = counts[p.id];
-            p.percentage = parseFloat(((p.claimedCount / total) * 100).toFixed(2));
+            let count = 0;
+            for (let x = 0; x < GRID; x++) {
+                for (let y = 0; y < GRID; y++) {
+                    if (this.grid[x][y] === p.id) count++;
+                }
+            }
+            p.claimedCount = count;
+            p.percentage = (count / totalCells) * 100.0;
         });
     }
 
     renderUI() {
-        // Top Left Score & Kills
-        let pct = this.humanPlayer.percentage.toFixed(2);
-        document.getElementById('playerPctText').textContent = `${pct} %`;
-        document.getElementById('playerPctFill').style.width = `${Math.min(100, pct * 3)}%`;
-        document.getElementById('playerKillsText').textContent = `x${this.humanPlayer.kills}`;
+        // 1. Update Human Player Score Bar
+        const pctFill = document.getElementById('playerPctFill');
+        const pctText = document.getElementById('playerPctText');
+        const killsText = document.getElementById('playerKillsText');
 
-        // Top Right Leaderboard (Matching Image 2)
-        let sorted = [...this.players].sort((a, b) => b.percentage - a.percentage);
+        if (pctFill) pctFill.style.width = `${Math.min(100, this.humanPlayer.percentage)}%`;
+        if (pctText) pctText.textContent = `🏆 ${this.humanPlayer.percentage.toFixed(2)} %`;
+        if (killsText) killsText.textContent = `x${this.humanPlayer.kills}`;
+
+        // 2. Render Top Right Leaderboard
         const lbContainer = document.getElementById('leaderboardList');
-        lbContainer.innerHTML = '';
+        if (lbContainer) {
+            let sorted = [...this.players].sort((a, b) => b.percentage - a.percentage);
+            let html = '';
+            sorted.slice(0, 5).forEach((p, idx) => {
+                let isPlayer = (p.id === this.humanPlayer.id);
+                let rankClass = isPlayer ? 'lb-card player-card' : 'lb-card';
+                html += `
+                    <div class="${rankClass}">
+                        <span class="lb-rank">#${idx + 1}</span>
+                        <span class="lb-name" style="color: ${p.color};">${p.name}</span>
+                        <span class="lb-pct">${p.percentage.toFixed(2)}%</span>
+                    </div>
+                `;
+            });
+            lbContainer.innerHTML = html;
+        }
 
-        sorted.slice(0, 5).forEach((p, rank) => {
-            const card = document.createElement('div');
-            card.className = `lb-card ${p === this.humanPlayer ? 'player-card' : ''}`;
-            card.innerHTML = `
-                <span class="lb-rank">${rank + 1}</span>
-                <span class="lb-pct">${p.percentage.toFixed(2)}%</span>
-                <span class="lb-name" style="color: ${p.color}">${p.name}</span>
-            `;
-            lbContainer.appendChild(card);
-        });
-
-        // Minimap Render (Matching Image 2)
+        // 3. Render Minimap Radar
         this.renderMinimap();
     }
 
     renderMinimap() {
-        const mCtx = this.minimapCtx;
-        const w = 120, h = 120;
-        mCtx.fillStyle = '#EBF0F5';
-        mCtx.fillRect(0, 0, w, h);
+        let mCanvas = this.minimapCanvas;
+        let mCtx = this.minimapCtx;
+        mCtx.clearRect(0, 0, mCanvas.width, mCanvas.height);
 
-        const scale = w / GRID;
+        let scale = mCanvas.width / GRID;
+
         for (let x = 0; x < GRID; x++) {
             for (let y = 0; y < GRID; y++) {
                 let owner = this.grid[x][y];
                 if (owner > 0) {
-                    let p = this.players.find(pl => pl.id === owner);
+                    let p = this.players.find(player => player.id === owner);
                     if (p) {
-                        mCtx.fillStyle = p.territoryColor;
-                        mCtx.fillRect(x * scale, y * scale, scale + 0.5, scale + 0.5);
+                        mCtx.fillStyle = p.color;
+                        mCtx.fillRect(x * scale, y * scale, scale, scale);
                     }
                 }
             }
         }
 
-        // Draw Player positions on Minimap
+        // Render player dots on radar
         this.players.forEach(p => {
             if (p.isAlive) {
                 mCtx.fillStyle = p.color;
@@ -647,31 +758,46 @@ class PaperIOGame {
             let sorted = [...this.players].sort((a, b) => b.percentage - a.percentage);
             let winner = sorted[0].name;
 
+            // Calculate coins earned: 50 coins per kill + territory bonus
+            let coinsEarned = (this.humanPlayer.kills * 50) + Math.floor(this.humanPlayer.percentage * 10);
+            this.addCoins(coinsEarned);
+
             this.saveMatchToJDBC(winner, sorted);
 
             const titleElem = document.getElementById('overlayTitle');
             const subtitleElem = document.getElementById('overlaySubtitle');
             const reasonElem = document.getElementById('overlayDeathReason');
 
+            const pctStat = document.getElementById('overlayPctStat');
+            const killsStat = document.getElementById('overlayKillsStat');
+            const coinsStat = document.getElementById('overlayCoinsStat');
+            const timeStat = document.getElementById('overlayTimeStat');
+
+            if (pctStat) pctStat.textContent = `${this.humanPlayer.percentage.toFixed(2)}%`;
+            if (killsStat) killsStat.textContent = `${this.humanPlayer.kills}`;
+            if (coinsStat) coinsStat.textContent = `+${coinsEarned}`;
+            
+            const mins = Math.floor(this.elapsedSeconds / 60);
+            const secs = this.elapsedSeconds % 60;
+            if (timeStat) timeStat.textContent = `${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
+
             if (humanWon) {
-                if (titleElem) titleElem.textContent = "VICTORY!";
-                if (titleElem) titleElem.style.color = "#10B981";
+                if (titleElem) { titleElem.textContent = "🏆 VICTORY!"; titleElem.style.color = "#10B981"; }
                 if (subtitleElem) subtitleElem.textContent = `You conquered ${this.humanPlayer.percentage.toFixed(2)}% of the arena & eliminated all rivals!`;
                 if (reasonElem) {
                     reasonElem.innerHTML = `🏆 <b>1st Place Winner!</b>`;
-                    reasonElem.style.background = "#ECFDF5";
-                    reasonElem.style.color = "#059669";
-                    reasonElem.style.borderColor = "#6EE7B7";
+                    reasonElem.style.background = "rgba(16, 185, 129, 0.2)";
+                    reasonElem.style.color = "#10B981";
+                    reasonElem.style.borderColor = "#059669";
                 }
             } else {
-                if (titleElem) titleElem.textContent = "YOU DIED";
-                if (titleElem) titleElem.style.color = "#FF1744";
+                if (titleElem) { titleElem.textContent = "GAME OVER"; titleElem.style.color = "#EF4444"; }
                 if (subtitleElem) subtitleElem.textContent = `Conquered ${this.humanPlayer.percentage.toFixed(2)}% of the arena`;
 
                 if (reasonElem) {
                     let text = "";
                     if (this.humanPlayer.killedBy) {
-                        text = `💀 Killed by <strong style="color: #0F172A; margin: 0 4px;">${this.humanPlayer.killedBy}</strong> (${this.humanPlayer.deathReason || 'Trail Cut'})`;
+                        text = `💀 Killed by <strong style="color: #F8FAFC; margin: 0 4px;">${this.humanPlayer.killedBy}</strong> (${this.humanPlayer.deathReason || 'Trail Cut'})`;
                     } else if (this.humanPlayer.deathReason === "self-collision") {
                         text = `⚠️ Ran into your own trail!`;
                     } else if (this.humanPlayer.deathReason === "crashed into map border") {
@@ -682,9 +808,9 @@ class PaperIOGame {
                         text = `💀 ${this.humanPlayer.deathReason || 'Eliminated'}`;
                     }
                     reasonElem.innerHTML = text;
-                    reasonElem.style.background = "#FEF2F2";
-                    reasonElem.style.color = "#DC2626";
-                    reasonElem.style.borderColor = "#FCA5A5";
+                    reasonElem.style.background = "rgba(239, 68, 68, 0.15)";
+                    reasonElem.style.color = "#F87171";
+                    reasonElem.style.borderColor = "rgba(239, 68, 68, 0.4)";
                 }
             }
 
@@ -698,6 +824,17 @@ class PaperIOGame {
         }
     }
 
+    addCoins(amount) {
+        const coinsElem = document.getElementById('coinsText');
+        let currentCoins = 12591;
+        if (coinsElem) {
+            let parsed = parseInt(coinsElem.textContent.replace(/,/g, ''), 10);
+            if (!isNaN(parsed)) currentCoins = parsed;
+            currentCoins += amount;
+            coinsElem.textContent = currentCoins.toLocaleString();
+        }
+    }
+
     saveMatchToJDBC(winner, sorted) {
         let matches = JSON.parse(localStorage.getItem('paper_io_matches') || '[]');
         matches.unshift({
@@ -705,6 +842,7 @@ class PaperIOGame {
             time: new Date().toLocaleTimeString(),
             winner: winner,
             pct: this.humanPlayer.percentage,
+            kills: this.humanPlayer.kills,
             duration: this.elapsedSeconds
         });
         localStorage.setItem('paper_io_matches', JSON.stringify(matches.slice(0, 30)));
@@ -713,7 +851,6 @@ class PaperIOGame {
     openDBModal() {
         let matches = JSON.parse(localStorage.getItem('paper_io_matches') || '[]');
         if (matches.length === 0) {
-            // Provide default initial sample records if no matches played yet
             matches = [
                 { id: 1, time: "12:45:10 PM", winner: "Player", pct: 14.85, duration: 42 },
                 { id: 2, time: "01:12:34 PM", winner: "Dahlia", pct: 9.12, duration: 35 },
@@ -724,13 +861,14 @@ class PaperIOGame {
 
         let body = document.getElementById('dbHistoryBody');
         body.innerHTML = '';
-        matches.forEach(m => {
+        matches.slice(0, 10).forEach((m, idx) => {
+            let medal = idx === 0 ? '🥇 ' : idx === 1 ? '🥈 ' : idx === 2 ? '🥉 ' : `#${idx + 1} `;
             body.innerHTML += `
                 <tr>
-                    <td>#${m.id}</td>
+                    <td style="font-weight: 900; color: #38BDF8;">${medal}</td>
                     <td>${m.time}</td>
                     <td><b>${m.winner}</b></td>
-                    <td><span style="color:#0284C7;font-weight:800;">${m.pct.toFixed(2)}%</span></td>
+                    <td><span style="color:#00E5FF;font-weight:800;">${m.pct.toFixed(2)}%</span></td>
                     <td>${m.duration}s</td>
                 </tr>
             `;
@@ -739,14 +877,7 @@ class PaperIOGame {
     }
 
     claimDailyReward() {
-        const coinsElem = document.getElementById('coinsText');
-        let currentCoins = 12591;
-        if (coinsElem) {
-            let parsed = parseInt(coinsElem.textContent.replace(/,/g, ''), 10);
-            if (!isNaN(parsed)) currentCoins = parsed;
-            currentCoins += 1000;
-            coinsElem.textContent = currentCoins.toLocaleString();
-        }
+        this.addCoins(1000);
         this.addKillToast(`🎁 <b>DAILY REWARD CLAIMED!</b> +1,000 Gold Coins added! 🎉`);
         this.activateSpeedBoost(10);
     }
@@ -768,76 +899,107 @@ class PaperIOGame {
         this.cameraX += (targetCamX - this.cameraX) * 0.1;
         this.cameraY += (targetCamY - this.cameraY) * 0.1;
 
-        this.ctx.fillStyle = '#EFF3F6';
-        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        let ctx = this.ctx;
+        let w = this.canvas.width;
+        let h = this.canvas.height;
 
-        this.ctx.save();
-        // Translate to center and apply zoom scale for full arena field-of-view
-        this.ctx.translate(this.canvas.width / 2, this.canvas.height / 2);
-        this.ctx.scale(this.zoomScale, this.zoomScale);
-        this.ctx.translate(-this.cameraX, -this.cameraY);
+        ctx.clearRect(0, 0, w, h);
 
-        // 1. Render Map Boundary Border
-        this.ctx.strokeStyle = '#CBD5E1';
-        this.ctx.lineWidth = 8;
-        this.ctx.strokeRect(0, 0, MAP_SIZE, MAP_SIZE);
+        ctx.save();
+        // Camera Centering & Zoom Scale Transformation
+        ctx.translate(w / 2, h / 2);
+        ctx.scale(this.zoomScale, this.zoomScale);
+        ctx.translate(-this.cameraX, -this.cameraY);
 
-        // 2. Render Territory Polygons (Matching Image 2 Aesthetic)
+        // 1. Draw World Arena Grid Background
+        ctx.fillStyle = '#0F172A'; // Dark Gaming Arena Background
+        ctx.fillRect(0, 0, MAP_SIZE, MAP_SIZE);
+
+        ctx.strokeStyle = '#1E293B';
+        ctx.lineWidth = 1;
+        for (let x = 0; x <= MAP_SIZE; x += CELL_SIZE) {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, MAP_SIZE);
+            ctx.stroke();
+        }
+        for (let y = 0; y <= MAP_SIZE; y += CELL_SIZE) {
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(MAP_SIZE, y);
+            ctx.stroke();
+        }
+
+        // World Arena Outer Border Glow
+        ctx.strokeStyle = '#38BDF8';
+        ctx.lineWidth = 6;
+        ctx.strokeRect(0, 0, MAP_SIZE, MAP_SIZE);
+
+        // 2. Draw Territory Claims
         for (let x = 0; x < GRID; x++) {
             for (let y = 0; y < GRID; y++) {
                 let owner = this.grid[x][y];
                 if (owner > 0) {
-                    let p = this.players.find(pl => pl.id === owner);
+                    let p = this.players.find(player => player.id === owner);
                     if (p) {
-                        this.ctx.fillStyle = p.territoryColor;
-                        this.ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE + 0.5, CELL_SIZE + 0.5);
+                        ctx.fillStyle = p.territoryColor;
+                        ctx.fillRect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE);
                     }
                 }
             }
         }
 
-        // 3. Render Active Trails
+        // 3. Draw Active Glowing Player Trails
         for (let x = 0; x < GRID; x++) {
             for (let y = 0; y < GRID; y++) {
-                let owner = this.trailGrid[x][y];
-                if (owner > 0) {
-                    let p = this.players.find(pl => pl.id === owner);
+                let trailOwner = this.trailGrid[x][y];
+                if (trailOwner > 0) {
+                    let p = this.players.find(player => player.id === trailOwner);
                     if (p) {
-                        this.ctx.fillStyle = p.trailColor;
-                        this.ctx.fillRect(x * CELL_SIZE + 1, y * CELL_SIZE + 1, CELL_SIZE - 2, CELL_SIZE - 2);
+                        ctx.fillStyle = p.trailColor;
+                        ctx.shadowColor = p.color;
+                        ctx.shadowBlur = 8;
+                        ctx.fillRect(x * CELL_SIZE + 2, y * CELL_SIZE + 2, CELL_SIZE - 4, CELL_SIZE - 4);
+                        ctx.shadowBlur = 0;
                     }
                 }
             }
         }
 
-        // 4. Render Player Avatars & Floating Names (Matching Image 2)
+        // 4. Render Player Square Heads & Nametags
         this.players.forEach(p => {
             if (p.isAlive) {
-                let px = p.x * CELL_SIZE + CELL_SIZE / 2;
-                let py = p.y * CELL_SIZE + CELL_SIZE / 2;
+                let px = p.x * CELL_SIZE;
+                let py = p.y * CELL_SIZE;
 
-                // Glowing outer ring
-                this.ctx.fillStyle = p.color;
-                this.ctx.beginPath();
-                this.ctx.arc(px, py, CELL_SIZE * 0.7, 0, Math.PI * 2);
-                this.ctx.fill();
+                // Player Square Box
+                ctx.fillStyle = p.color;
+                ctx.shadowColor = p.color;
+                ctx.shadowBlur = 12;
+                ctx.fillRect(px, py, CELL_SIZE, CELL_SIZE);
+                ctx.shadowBlur = 0;
 
-                // Player Center Cube
-                this.ctx.fillStyle = '#FFFFFF';
-                this.ctx.fillRect(px - CELL_SIZE * 0.4, py - CELL_SIZE * 0.4, CELL_SIZE * 0.8, CELL_SIZE * 0.8);
+                ctx.strokeStyle = '#FFFFFF';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(px + 2, py + 2, CELL_SIZE - 4, CELL_SIZE - 4);
 
-                // Floating Name Label (Matching Image 2)
-                this.ctx.font = 'bold 15px Outfit, sans-serif';
-                this.ctx.fillStyle = '#1E293B';
-                this.ctx.textAlign = 'center';
-                this.ctx.fillText(p.name, px, py - CELL_SIZE * 1.1);
+                // Inner Eye Indicator Dot
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillRect(px + CELL_SIZE / 3, py + CELL_SIZE / 3, CELL_SIZE / 3, CELL_SIZE / 3);
+
+                // Nametag
+                ctx.fillStyle = '#FFFFFF';
+                ctx.font = 'bold 12px Outfit, sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(p.name, px + CELL_SIZE / 2, py - 6);
             }
         });
 
-        this.ctx.restore();
+        ctx.restore();
     }
 }
 
-window.onload = () => {
-    new PaperIOGame();
-};
+// Initialize Game Engine on DOM Load
+window.addEventListener('DOMContentLoaded', () => {
+    window.gameInstance = new PaperIOGame();
+});
