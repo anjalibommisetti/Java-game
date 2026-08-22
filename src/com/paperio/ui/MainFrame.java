@@ -281,10 +281,10 @@ public class MainFrame extends JFrame implements CollisionEngine.CollisionEventL
     private void showGameOverDialog(String winnerName, List<Player> rankings) {
         StringBuilder sb = new StringBuilder();
         if (!humanPlayer.isAlive()) {
-            sb.append("💀 CAUSE OF ELIMINATION:\n");
+            sb.append("\uD83D\uDC80 CAUSE OF ELIMINATION:\n");
             sb.append("   ").append(humanPlayerDeathReason.isEmpty() ? "You were eliminated!" : humanPlayerDeathReason).append("\n\n");
         } else {
-            sb.append("🏆 VICTORY!\n   You conquered the arena & eliminated all rivals!\n\n");
+            sb.append("\uD83C\uDFC6 VICTORY!\n   You conquered the arena & eliminated all rivals!\n\n");
         }
         sb.append("Winner: ").append(winnerName).append("\n\n");
         sb.append("Final Territory Rankings:\n");
