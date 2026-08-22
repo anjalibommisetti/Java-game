@@ -138,16 +138,16 @@ public class MainFrame extends JFrame implements CollisionEngine.CollisionEventL
         hudPanel.setGameStatus("MATCH ACTIVE", new Color(76, 209, 55));
         hudPanel.addEventLog("Match started with " + (players.size() - 1) + " AI rivals!");
 
-        // Spawn Human at Center Top-Left
-        gridManager.spawnPlayer(humanPlayer, 20, 20, 3);
+        // Spawn Human at Center Top-Left with larger 9x9 initial base (radius 4)
+        gridManager.spawnPlayer(humanPlayer, 25, 25, 4);
 
-        // Spawn AI Players at evenly spaced coordinates
-        int[][] spawnCoords = {{60, 60}, {60, 20}, {20, 60}, {40, 40}};
+        // Spawn AI Players at evenly spaced coordinates with larger 9x9 initial base
+        int[][] spawnCoords = {{55, 55}, {55, 25}, {25, 55}, {40, 40}};
         int aiIdx = 0;
         for (Player p : players) {
             if (p.isAI()) {
                 int[] pos = spawnCoords[aiIdx % spawnCoords.length];
-                gridManager.spawnPlayer(p, pos[0], pos[1], 3);
+                gridManager.spawnPlayer(p, pos[0], pos[1], 4);
                 aiIdx++;
             }
         }

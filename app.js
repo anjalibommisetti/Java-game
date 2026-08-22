@@ -208,9 +208,9 @@ class PaperIOGame {
             p.aiExcursion = 0;
             p.aiMaxExcursion = 8 + Math.floor(Math.random() * 8);
 
-            // Initial 7x7 Base
-            for (let dx = -3; dx <= 3; dx++) {
-                for (let dy = -3; dy <= 3; dy++) {
+            // Initial 9x9 Base (radius 4)
+            for (let dx = -4; dx <= 4; dx++) {
+                for (let dy = -4; dy <= 4; dy++) {
                     let tx = p.x + dx;
                     let ty = p.y + dy;
                     if (this.isValid(tx, ty)) {
