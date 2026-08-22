@@ -577,12 +577,17 @@ body, html {
     background: rgba(15, 23, 42, 0.8);
     color: #94A3B8;
     border: 1.5px solid rgba(255, 255, 255, 0.15);
-    padding: 4px 10px;
+    padding: 6px 12px;
     border-radius: 10px;
     font-family: inherit;
     font-size: 0.8rem;
     font-weight: 800;
     cursor: pointer;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
     transition: all 0.15s ease;
 }
 
@@ -607,12 +612,17 @@ body, html {
     background: rgba(15, 23, 42, 0.8);
     color: #94A3B8;
     border: 1.5px solid rgba(255, 255, 255, 0.15);
-    padding: 4px 10px;
+    padding: 6px 12px;
     border-radius: 10px;
     font-family: inherit;
     font-size: 0.8rem;
     font-weight: 800;
     cursor: pointer;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
     transition: all 0.15s ease;
 }
 
