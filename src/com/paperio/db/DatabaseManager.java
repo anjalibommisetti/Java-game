@@ -15,7 +15,7 @@ public class DatabaseManager {
         try {
             Class.forName("org.sqlite.JDBC");
             initTables();
-        } catch (Exception e) {
+        } catch (Throwable e) {
             System.err.println("JDBC Database Init Warning: " + e.getMessage());
         }
     }
