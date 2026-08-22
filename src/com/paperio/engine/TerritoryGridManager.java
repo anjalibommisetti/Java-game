@@ -1,5 +1,6 @@
 package com.paperio.engine;
 
+import com.paperio.model.Direction;
 import com.paperio.model.Player;
 
 import java.awt.Point;

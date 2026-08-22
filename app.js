@@ -60,7 +60,8 @@ class PaperIOGame {
         this.elapsedSeconds = 0;
         this.lastStepTime = 0;
         this.lastTimerTick = 0;
-        this.stepDelay = 60; // Faster, smooth tick rate (matches official Paper.io 2)
+        
+        this.setSpeedMode(localStorage.getItem('paperio_speed_mode') || 'normal');
 
         this.resizeCanvas();
         window.addEventListener('resize', () => this.resizeCanvas());
@@ -72,6 +73,23 @@ class PaperIOGame {
         document.getElementById('startOverlay').classList.remove('hidden');
 
         requestAnimationFrame((t) => this.loop(t));
+    }
+
+    setSpeedMode(mode) {
+        this.currentSpeedMode = mode;
+        const speedMap = { slow: 130, normal: 95, fast: 60 };
+        this.baseStepDelay = speedMap[mode] || 95;
+        this.stepDelay = this.baseStepDelay;
+        localStorage.setItem('paperio_speed_mode', mode);
+
+        const speedBtns = document.querySelectorAll('.speed-btn');
+        speedBtns.forEach(btn => {
+            if (btn.getAttribute('data-speed') === mode) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
     }
 
     setZoom(scale) {
@@ -164,13 +182,8 @@ class PaperIOGame {
             let s = spawns[idx % spawns.length];
             p.x = s.x;
             p.y = s.y;
-            if (p === this.humanPlayer) {
-                p.vx = 1; // Auto start moving right like official Paper.io 2
-                p.vy = 0;
-            } else {
-                p.vx = 0;
-                p.vy = 0;
-            }
+            p.vx = 0; // Wait for player directional input before moving
+            p.vy = 0;
             p.trail = [];
             p.isOutside = false;
             p.isAlive = true;
@@ -351,6 +364,14 @@ class PaperIOGame {
                 btn.classList.add('active');
                 const selectedColor = btn.getAttribute('data-color');
                 this.saveProfile(this.humanPlayer.name, selectedColor, false);
+            });
+        });
+
+        const speedBtns = document.querySelectorAll('.speed-btn');
+        speedBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const mode = btn.getAttribute('data-speed');
+                this.setSpeedMode(mode);
             });
         });
 
@@ -994,11 +1015,11 @@ class PaperIOGame {
     }
 
     activateSpeedBoost(seconds = 6) {
-        this.stepDelay = 40; // Double speed tick rate (40ms instead of 80ms)
+        this.stepDelay = Math.max(35, Math.floor(this.baseStepDelay * 0.5));
         this.addKillToast(`⚡ <b>SPEED SURGE ACTIVATED!</b> 2x Speed for ${seconds}s!`);
         if (this.speedTimer) clearTimeout(this.speedTimer);
         this.speedTimer = setTimeout(() => {
-            this.stepDelay = 80;
+            this.stepDelay = this.baseStepDelay;
             this.addKillToast(`⏱️ Speed boost expired.`);
         }, seconds * 1000);
     }

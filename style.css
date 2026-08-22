@@ -430,6 +430,7 @@ body, html {
     font-weight: 900;
     background: linear-gradient(135deg, #00E5FF, #0284C7);
     -webkit-background-clip: text;
+    background-clip: text;
     -webkit-text-fill-color: transparent;
     letter-spacing: -1px;
 }
@@ -565,6 +566,36 @@ body, html {
     border-color: #FFFFFF;
     transform: scale(1.2);
     box-shadow: 0 0 10px currentColor;
+}
+
+.speed-options {
+    display: flex;
+    gap: 6px;
+}
+
+.speed-btn {
+    background: rgba(15, 23, 42, 0.8);
+    color: #94A3B8;
+    border: 1.5px solid rgba(255, 255, 255, 0.15);
+    padding: 4px 10px;
+    border-radius: 10px;
+    font-family: inherit;
+    font-size: 0.8rem;
+    font-weight: 800;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.speed-btn:hover {
+    color: #FFFFFF;
+    border-color: #0284C7;
+}
+
+.speed-btn.active {
+    background: rgba(2, 132, 199, 0.3);
+    color: #00E5FF;
+    border-color: #00E5FF;
+    box-shadow: 0 0 10px rgba(0, 229, 255, 0.3);
 }
 
 /* --- How To Play Rules Grid --- */

@@ -362,8 +362,23 @@ public class MainFrame extends JFrame implements CollisionEngine.CollisionEventL
             diffMenu.add(mi);
         }
 
+        JMenu speedMenu = new JMenu("Player Speed");
+        String[] speeds = {"Slow (Easy)", "Normal (Balanced)", "Fast (Challenge)"};
+        int[] delays = {160, 110, 70};
+        for (int i = 0; i < speeds.length; i++) {
+            int delay = delays[i];
+            String label = speeds[i];
+            JMenuItem mi = new JMenuItem(label);
+            mi.addActionListener(e -> {
+                playerStepDelay = delay;
+                hudPanel.addEventLog("Player Speed set to: " + label);
+            });
+            speedMenu.add(mi);
+        }
+
         optMenu.add(rivalMenu);
         optMenu.add(diffMenu);
+        optMenu.add(speedMenu);
 
         // Database Menu
         JMenu dbMenu = new JMenu("Database (JDBC)");
