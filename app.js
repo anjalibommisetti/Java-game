@@ -62,6 +62,7 @@ class PaperIOGame {
         this.lastTimerTick = 0;
         
         this.setSpeedMode(localStorage.getItem('paperio_speed_mode') || 'normal');
+        this.setControlMode(localStorage.getItem('paperio_control_mode') || 'keyboard');
 
         this.resizeCanvas();
         window.addEventListener('resize', () => this.resizeCanvas());
@@ -85,6 +86,20 @@ class PaperIOGame {
         const speedBtns = document.querySelectorAll('.speed-btn');
         speedBtns.forEach(btn => {
             if (btn.getAttribute('data-speed') === mode) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+    }
+
+    setControlMode(mode) {
+        this.controlMode = mode;
+        localStorage.setItem('paperio_control_mode', mode);
+
+        const ctrlBtns = document.querySelectorAll('.ctrl-mode-btn');
+        ctrlBtns.forEach(btn => {
+            if (btn.getAttribute('data-mode') === mode) {
                 btn.classList.add('active');
             } else {
                 btn.classList.remove('active');
@@ -245,8 +260,9 @@ class PaperIOGame {
     }
 
     bindControls() {
-        // Mouse Cursor Steering Controls (Paper.io 2 Style)
+        // Mouse Cursor Steering Controls (Only active if Mouse Follow mode is selected)
         window.addEventListener('mousemove', (e) => {
+            if (this.controlMode !== 'mouse') return; // Ignore mouse movements in Keyboard & D-Pad mode!
             if (!this.humanPlayer || !this.humanPlayer.isAlive || this.isPaused || !this.gameStarted) return;
             const centerX = window.innerWidth / 2;
             const centerY = window.innerHeight / 2;
@@ -372,6 +388,14 @@ class PaperIOGame {
             btn.addEventListener('click', () => {
                 const mode = btn.getAttribute('data-speed');
                 this.setSpeedMode(mode);
+            });
+        });
+
+        const ctrlBtns = document.querySelectorAll('.ctrl-mode-btn');
+        ctrlBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                const mode = btn.getAttribute('data-mode');
+                this.setControlMode(mode);
             });
         });
 
