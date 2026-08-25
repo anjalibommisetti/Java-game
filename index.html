@@ -97,56 +97,59 @@
                 </div>
                 <p class="subtitle">Conquer territory, eliminate rivals, and claim #1 on the leaderboard!</p>
 
-                <!-- Profile Customization Section -->
-                <div class="profile-editor">
-                    <h3>👤 Player Profile</h3>
-                    <div class="input-row">
-                        <label for="playerNameInput">Nickname:</label>
-                        <div class="name-input-wrapper">
-                            <input type="text" id="playerNameInput" placeholder="Enter Your Nickname" value="Player" maxlength="15" class="name-input" autocomplete="off">
-                            <button type="button" id="btn-clear-name" class="btn-clear" title="Clear Text">✕</button>
+                <!-- 2-Column Desktop Grid Wrapper -->
+                <div class="start-content-grid">
+                    <!-- Profile Customization Section -->
+                    <div class="profile-editor">
+                        <h3>👤 Player Profile</h3>
+                        <div class="input-row">
+                            <label for="playerNameInput">Nickname:</label>
+                            <div class="name-input-wrapper">
+                                <input type="text" id="playerNameInput" placeholder="Enter Your Nickname" value="Player" maxlength="15" class="name-input" autocomplete="off">
+                                <button type="button" id="btn-clear-name" class="btn-clear" title="Clear Text">✕</button>
+                            </div>
+                        </div>
+                        <div id="nameValidationMsg" class="validation-msg hidden">⚠️ Please enter a nickname to start!</div>
+                        
+                        <div class="input-row" style="margin-top: 10px;">
+                            <label>Skin Color:</label>
+                            <div class="color-options">
+                                <button type="button" class="color-btn active" data-color="#00E5FF" style="background: #00E5FF;" title="Cyan"></button>
+                                <button type="button" class="color-btn" data-color="#FF2D55" style="background: #FF2D55;" title="Neon Pink"></button>
+                                <button type="button" class="color-btn" data-color="#FFCC00" style="background: #FFCC00;" title="Gold Yellow"></button>
+                                <button type="button" class="color-btn" data-color="#00E676" style="background: #00E676;" title="Emerald Green"></button>
+                                <button type="button" class="color-btn" data-color="#AF52DE" style="background: #AF52DE;" title="Purple"></button>
+                            </div>
+                        </div>
+                        <div class="input-row" style="margin-top: 10px;">
+                            <label>Game Speed:</label>
+                            <div class="speed-options">
+                                <button type="button" class="speed-btn" data-speed="slow" title="Slow & Easy Mode (140ms)">🐢 Slow</button>
+                                <button type="button" class="speed-btn active" data-speed="normal" title="Normal Balanced Mode (95ms)">⚖️ Normal</button>
+                                <button type="button" class="speed-btn" data-speed="fast" title="Fast Challenge Mode (60ms)">⚡ Fast</button>
+                            </div>
+                        </div>
+                        <div class="input-row" style="margin-top: 10px;">
+                            <label>Steering:</label>
+                            <div class="control-mode-options">
+                                <button type="button" class="ctrl-mode-btn active" data-mode="keyboard" title="Keyboard Keys & D-Pad (Recommended - No Mouse Interference)">⌨️ Keyboard</button>
+                                <button type="button" class="ctrl-mode-btn" data-mode="mouse" title="Mouse Pointer Steering">🖱️ Mouse Follow</button>
+                            </div>
                         </div>
                     </div>
-                    <div id="nameValidationMsg" class="validation-msg hidden">⚠️ Please enter a nickname to start!</div>
-                    
-                    <div class="input-row" style="margin-top: 10px;">
-                        <label>Skin Color:</label>
-                        <div class="color-options">
-                            <button type="button" class="color-btn active" data-color="#00E5FF" style="background: #00E5FF;" title="Cyan"></button>
-                            <button type="button" class="color-btn" data-color="#FF2D55" style="background: #FF2D55;" title="Neon Pink"></button>
-                            <button type="button" class="color-btn" data-color="#FFCC00" style="background: #FFCC00;" title="Gold Yellow"></button>
-                            <button type="button" class="color-btn" data-color="#00E676" style="background: #00E676;" title="Emerald Green"></button>
-                            <button type="button" class="color-btn" data-color="#AF52DE" style="background: #AF52DE;" title="Purple"></button>
-                        </div>
-                    </div>
-                    <div class="input-row" style="margin-top: 10px;">
-                        <label>Game Speed:</label>
-                        <div class="speed-options">
-                            <button type="button" class="speed-btn" data-speed="slow" title="Slow & Easy Mode (140ms)">🐢 Slow</button>
-                            <button type="button" class="speed-btn active" data-speed="normal" title="Normal Balanced Mode (95ms)">⚖️ Normal</button>
-                            <button type="button" class="speed-btn" data-speed="fast" title="Fast Challenge Mode (60ms)">⚡ Fast</button>
-                        </div>
-                    </div>
-                    <div class="input-row" style="margin-top: 10px;">
-                        <label>Steering:</label>
-                        <div class="control-mode-options">
-                            <button type="button" class="ctrl-mode-btn active" data-mode="keyboard" title="Keyboard Keys & D-Pad (Recommended - No Mouse Interference)">⌨️ Keyboard</button>
-                            <button type="button" class="ctrl-mode-btn" data-mode="mouse" title="Mouse Pointer Steering">🖱️ Mouse Follow</button>
-                        </div>
-                    </div>
-                </div>
 
-                <!-- How To Play Instructions Section -->
-                <div class="control-instructions">
-                    <h3>📖 How To Play</h3>
-                    <div class="rules-grid">
-                        <div class="rule-item">1. Venture outside your color base to draw a trail.</div>
-                        <div class="rule-item">2. Return safely to your base to enclose &amp; claim territory.</div>
-                        <div class="rule-item">3. Don't hit your own trail or let rivals cut your trail!</div>
-                        <div class="rule-item">4. Cut opponent trails to eliminate them &amp; gain kills.</div>
-                    </div>
-                    <div class="controls-legend">
-                        <span>⌨️ Controls: <b>WASD</b> / <b>Arrow Keys</b> | <b>P</b> to Pause</span>
+                    <!-- How To Play Instructions Section -->
+                    <div class="control-instructions">
+                        <h3>📖 How To Play</h3>
+                        <div class="rules-grid">
+                            <div class="rule-item">1. Venture outside your color base to draw a trail.</div>
+                            <div class="rule-item">2. Return safely to your base to enclose &amp; claim territory.</div>
+                            <div class="rule-item">3. Don't hit your own trail or let rivals cut your trail!</div>
+                            <div class="rule-item">4. Cut opponent trails to eliminate them &amp; gain kills.</div>
+                        </div>
+                        <div class="controls-legend">
+                            <span>⌨️ Controls: <b>WASD</b> / <b>Arrow Keys</b> | <b>P</b> to Pause</span>
+                        </div>
                     </div>
                 </div>
 
