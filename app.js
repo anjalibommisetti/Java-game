@@ -24,6 +24,8 @@ class Player {
 
         this.claimedCount = 0;
         this.percentage = 0.0;
+        this.maxPercentage = 0.0;
+        this.finalPercentage = 0.0;
         this.kills = 0;
 
         // AI behavior fields
@@ -202,6 +204,11 @@ class PaperIOGame {
             p.trail = [];
             p.isOutside = false;
             p.isAlive = true;
+            p.claimedCount = 81;
+            const initPct = (81 / (GRID * GRID)) * 100.0;
+            p.percentage = initPct;
+            p.maxPercentage = initPct;
+            p.finalPercentage = initPct;
             p.kills = 0;
             p.deathReason = "";
             p.killedBy = "";
@@ -754,6 +761,20 @@ class PaperIOGame {
         victim.vx = 0;
         victim.vy = 0;
 
+        // Calculate victim's territory percentage at the moment of elimination BEFORE clearing grid
+        let totalCells = GRID * GRID;
+        let count = 0;
+        for (let x = 0; x < GRID; x++) {
+            for (let y = 0; y < GRID; y++) {
+                if (this.grid[x][y] === victim.id) count++;
+            }
+        }
+        let currentPct = (count / totalCells) * 100.0;
+        victim.finalPercentage = Math.max(currentPct, victim.percentage, victim.maxPercentage);
+        if (victim.finalPercentage === 0) {
+            victim.finalPercentage = (81 / totalCells) * 100.0; // Fallback for 9x9 initial base
+        }
+
         // Clear victim's territory and active trail
         victim.trail.forEach(pt => {
             this.trailGrid[pt.x][pt.y] = 0;
@@ -844,6 +865,12 @@ class PaperIOGame {
             }
             p.claimedCount = count;
             p.percentage = (count / totalCells) * 100.0;
+            if (p.percentage > p.maxPercentage) {
+                p.maxPercentage = p.percentage;
+            }
+            if (p.isAlive) {
+                p.finalPercentage = Math.max(p.percentage, p.maxPercentage);
+            }
         });
     }
 
@@ -920,11 +947,18 @@ class PaperIOGame {
 
         if (humanDead || humanWon) {
             this.isGameOver = true;
-            let sorted = [...this.players].sort((a, b) => b.percentage - a.percentage);
+
+            let finalPct = Math.max(this.humanPlayer.percentage, this.humanPlayer.finalPercentage, this.humanPlayer.maxPercentage);
+
+            let sorted = [...this.players].sort((a, b) => {
+                let scoreA = Math.max(a.percentage, a.finalPercentage, a.maxPercentage);
+                let scoreB = Math.max(b.percentage, b.finalPercentage, b.maxPercentage);
+                return scoreB - scoreA;
+            });
             let winner = sorted[0].name;
 
             // Calculate coins earned: 50 coins per kill + territory bonus
-            let coinsEarned = (this.humanPlayer.kills * 50) + Math.floor(this.humanPlayer.percentage * 10);
+            let coinsEarned = (this.humanPlayer.kills * 50) + Math.max(10, Math.floor(finalPct * 10));
             this.addCoins(coinsEarned);
 
             this.saveMatchToJDBC(winner, sorted);
@@ -938,7 +972,7 @@ class PaperIOGame {
             const coinsStat = document.getElementById('overlayCoinsStat');
             const timeStat = document.getElementById('overlayTimeStat');
 
-            if (pctStat) pctStat.textContent = `${this.humanPlayer.percentage.toFixed(2)}%`;
+            if (pctStat) pctStat.textContent = `${finalPct.toFixed(2)}%`;
             if (killsStat) killsStat.textContent = `${this.humanPlayer.kills}`;
             if (coinsStat) coinsStat.textContent = `+${coinsEarned}`;
             
@@ -948,7 +982,7 @@ class PaperIOGame {
 
             if (humanWon) {
                 if (titleElem) { titleElem.textContent = "🏆 VICTORY!"; titleElem.style.color = "#10B981"; }
-                if (subtitleElem) subtitleElem.textContent = `You conquered ${this.humanPlayer.percentage.toFixed(2)}% of the arena & eliminated all rivals!`;
+                if (subtitleElem) subtitleElem.textContent = `You conquered ${finalPct.toFixed(2)}% of the arena & eliminated all rivals!`;
                 if (reasonElem) {
                     reasonElem.innerHTML = `🏆 <b>1st Place Winner!</b>`;
                     reasonElem.style.background = "rgba(16, 185, 129, 0.2)";
@@ -957,7 +991,7 @@ class PaperIOGame {
                 }
             } else {
                 if (titleElem) { titleElem.textContent = "GAME OVER"; titleElem.style.color = "#EF4444"; }
-                if (subtitleElem) subtitleElem.textContent = `Conquered ${this.humanPlayer.percentage.toFixed(2)}% of the arena`;
+                if (subtitleElem) subtitleElem.textContent = `Conquered ${finalPct.toFixed(2)}% of the arena`;
 
                 if (reasonElem) {
                     let text = "";
@@ -982,7 +1016,8 @@ class PaperIOGame {
             let html = ``;
             sorted.forEach((p, idx) => {
                 let badge = !p.isAlive ? ` <span style="color:#94A3B8;font-size:0.8rem;">(Out)</span>` : '';
-                html += `<div>#${idx + 1} ${p.name}${badge} - ${p.percentage.toFixed(2)}% (${p.kills} kills)</div>`;
+                let score = Math.max(p.percentage, p.finalPercentage, p.maxPercentage);
+                html += `<div>#${idx + 1} ${p.name}${badge} - ${score.toFixed(2)}% (${p.kills} kills)</div>`;
             });
             document.getElementById('overlayRankings').innerHTML = html;
             document.getElementById('gameOverlay').classList.remove('hidden');
@@ -1002,11 +1037,12 @@ class PaperIOGame {
 
     saveMatchToJDBC(winner, sorted) {
         let matches = JSON.parse(localStorage.getItem('paper_io_matches') || '[]');
+        let finalPct = Math.max(this.humanPlayer.percentage, this.humanPlayer.finalPercentage, this.humanPlayer.maxPercentage);
         matches.unshift({
             id: matches.length + 1,
             time: new Date().toLocaleTimeString(),
             winner: winner,
-            pct: this.humanPlayer.percentage,
+            pct: finalPct,
             kills: this.humanPlayer.kills,
             duration: this.elapsedSeconds
         });
