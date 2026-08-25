@@ -1,8 +1,8 @@
 // Paper.io 2 Official Web Engine
 
-const GRID = 100;
-const MAP_SIZE = 2400; // World pixel size
-const CELL_SIZE = MAP_SIZE / GRID;
+const GRID = 140;
+const CELL_SIZE = 28;
+const MAP_SIZE = GRID * CELL_SIZE; // 3920px World pixel size
 
 class Player {
     constructor(id, name, isAI, color, territoryColor, trailColor) {
@@ -51,7 +51,7 @@ class PaperIOGame {
 
         this.cameraX = 0;
         this.cameraY = 0;
-        this.zoomScale = 0.35; // Default wide arena overview (35% scale)
+        this.zoomScale = 0.90; // Default wide immersive camera scale (90%)
         this.isPaused = false;
         this.isGameOver = false;
         this.gameStarted = false; // Waiting for user to click PLAY GAME NOW
@@ -182,15 +182,15 @@ class PaperIOGame {
         document.getElementById('pauseOverlay').classList.add('hidden');
         document.getElementById('startOverlay').classList.add('hidden');
 
-        // Spawn Locations evenly distributed
+        // Spawn Locations evenly distributed on 140x140 arena map
         const spawns = [
-            { x: 25, y: 25 },
-            { x: 75, y: 75 },
-            { x: 75, y: 25 },
-            { x: 25, y: 75 },
-            { x: 50, y: 20 },
-            { x: 50, y: 80 },
-            { x: 80, y: 50 }
+            { x: 30, y: 30 },
+            { x: 110, y: 110 },
+            { x: 110, y: 30 },
+            { x: 30, y: 110 },
+            { x: 70, y: 30 },
+            { x: 70, y: 110 },
+            { x: 110, y: 70 }
         ];
 
         this.players.forEach((p, idx) => {
@@ -288,21 +288,28 @@ class PaperIOGame {
 
         // Keyboard Controls for User Player & Pause
         window.addEventListener('keydown', (e) => {
-            const key = e.key.toLowerCase();
+            const key = e.key ? e.key.toLowerCase() : '';
             if (key === 'p' || key === 'escape') {
                 this.togglePause();
                 return;
             }
 
-            if (!this.humanPlayer || !this.humanPlayer.isAlive || this.isPaused) return;
+            // Prevent browser window scroll when using arrow keys / WASD during gameplay
+            if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd', ' '].includes(key)) {
+                if (document.activeElement && document.activeElement.tagName !== 'INPUT') {
+                    e.preventDefault();
+                }
+            }
 
-            if (key === 'arrowup' || key === 'w') {
+            if (!this.humanPlayer || !this.humanPlayer.isAlive || this.isPaused || !this.gameStarted) return;
+
+            if (key === 'arrowup' || key === 'w' || e.code === 'ArrowUp' || e.code === 'KeyW') {
                 if (this.humanPlayer.vy !== 1) { this.humanPlayer.vx = 0; this.humanPlayer.vy = -1; }
-            } else if (key === 'arrowdown' || key === 's') {
+            } else if (key === 'arrowdown' || key === 's' || e.code === 'ArrowDown' || e.code === 'KeyS') {
                 if (this.humanPlayer.vy !== -1) { this.humanPlayer.vx = 0; this.humanPlayer.vy = 1; }
-            } else if (key === 'arrowleft' || key === 'a') {
+            } else if (key === 'arrowleft' || key === 'a' || e.code === 'ArrowLeft' || e.code === 'KeyA') {
                 if (this.humanPlayer.vx !== 1) { this.humanPlayer.vx = -1; this.humanPlayer.vy = 0; }
-            } else if (key === 'arrowright' || key === 'd') {
+            } else if (key === 'arrowright' || key === 'd' || e.code === 'ArrowRight' || e.code === 'KeyD') {
                 if (this.humanPlayer.vx !== -1) { this.humanPlayer.vx = 1; this.humanPlayer.vy = 0; }
             }
         });
@@ -432,6 +439,8 @@ class PaperIOGame {
                 const activeColorBtn = document.querySelector('.color-btn.active');
                 const col = activeColorBtn ? activeColorBtn.getAttribute('data-color') : null;
 
+                if (document.activeElement) document.activeElement.blur();
+                window.focus();
                 this.saveProfile(val, col, true);
                 this.startNewMatch();
             };
