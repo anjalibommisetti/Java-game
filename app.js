@@ -1,17 +1,18 @@
-// Paper.io 2 Official Web Engine
+// TERRITORY RUSH - Official Web Engine & Game Loop
 
 const GRID = 140;
 const CELL_SIZE = 28;
-const MAP_SIZE = GRID * CELL_SIZE; // 3920px World pixel size
+const MAP_SIZE = GRID * CELL_SIZE; // 3920px World arena size
 
 class Player {
-    constructor(id, name, isAI, color, territoryColor, trailColor) {
+    constructor(id, name, isAI, color, territoryColor, trailColor, skinId = 'classic') {
         this.id = id;
         this.name = name;
         this.isAI = isAI;
         this.color = color;
         this.territoryColor = territoryColor;
         this.trailColor = trailColor;
+        this.skinId = skinId;
 
         this.x = 0;
         this.y = 0;
@@ -27,6 +28,16 @@ class Player {
         this.maxPercentage = 0.0;
         this.finalPercentage = 0.0;
         this.kills = 0;
+        this.coins = 0;
+        this.score = 0;
+
+        // Active Power-Ups Status
+        this.shieldActive = false;
+        this.shieldTimer = null;
+        this.magnetActive = false;
+        this.magnetTimer = null;
+        this.speedBoostActive = false;
+        this.speedBoostTimer = null;
 
         // AI behavior fields
         this.aiTarget = null;
@@ -37,7 +48,7 @@ class Player {
     }
 }
 
-class PaperIOGame {
+class TerritoryRushGame {
     constructor() {
         this.canvas = document.getElementById('gameCanvas');
         this.ctx = this.canvas.getContext('2d');
@@ -50,21 +61,29 @@ class PaperIOGame {
 
         this.players = [];
         this.humanPlayer = null;
+        this.spawnedItems = []; // Collectible Coins & Power-Ups on canvas
 
         this.cameraX = 0;
         this.cameraY = 0;
-        this.zoomScale = 0.90; // Default wide immersive camera scale (90%)
+        this.zoomScale = 0.90; // Default immersive camera scale (90%)
         this.isPaused = false;
         this.isGameOver = false;
-        this.gameStarted = false; // Waiting for user to click PLAY GAME NOW
+        this.gameStarted = false;
         this.matchInitialized = false;
 
         this.elapsedSeconds = 0;
         this.lastStepTime = 0;
         this.lastTimerTick = 0;
-        
-        this.setSpeedMode(localStorage.getItem('paperio_speed_mode') || 'normal');
-        this.setControlMode(localStorage.getItem('paperio_control_mode') || 'keyboard');
+        this.itemSpawnTimer = 0;
+
+        // Sound Effects Synthesizer Context
+        this.audioCtx = null;
+
+        // Load Persistent Settings & Skins & Stats
+        this.loadSettings();
+        this.loadSkinsData();
+        this.loadAchievementsData();
+        this.loadStatsData();
 
         this.resizeCanvas();
         window.addEventListener('resize', () => this.resizeCanvas());
@@ -72,10 +91,237 @@ class PaperIOGame {
         this.setupPlayers();
         this.bindControls();
         this.startNewMatch();
-        this.gameStarted = false; // Freeze match until user clicks PLAY GAME NOW
+        this.gameStarted = false; // Hold on start screen until PLAY GAME NOW is clicked
+        
         document.getElementById('startOverlay').classList.remove('hidden');
 
         requestAnimationFrame((t) => this.loop(t));
+    }
+
+    // --- Web Audio API Procedural Sound Synthesizer ---
+    initAudio() {
+        if (!this.audioCtx) {
+            const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
+            if (AudioCtxClass) this.audioCtx = new AudioCtxClass();
+        }
+        if (this.audioCtx && this.audioCtx.state === 'suspended') {
+            this.audioCtx.resume();
+        }
+    }
+
+    playSound(type) {
+        if (!this.settings.soundFx) return;
+        this.initAudio();
+        if (!this.audioCtx) return;
+
+        try {
+            const ctx = this.audioCtx;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+
+            const now = ctx.currentTime;
+
+            if (type === 'click') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, now);
+                osc.frequency.exponentialRampToValueAtTime(300, now + 0.05);
+                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.05);
+                osc.start(now);
+                osc.stop(now + 0.05);
+            } else if (type === 'capture') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(440, now);
+                osc.frequency.setValueAtTime(554.37, now + 0.08); // C#
+                osc.frequency.setValueAtTime(659.25, now + 0.16); // E
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.25);
+                osc.start(now);
+                osc.stop(now + 0.25);
+            } else if (type === 'coin') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(987.77, now); // B5
+                osc.frequency.setValueAtTime(1318.51, now + 0.06); // E6
+                gain.gain.setValueAtTime(0.25, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.18);
+                osc.start(now);
+                osc.stop(now + 0.18);
+            } else if (type === 'powerup') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(300, now);
+                osc.frequency.exponentialRampToValueAtTime(900, now + 0.2);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.25);
+                osc.start(now);
+                osc.stop(now + 0.25);
+            } else if (type === 'shield_save') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(800, now);
+                osc.frequency.exponentialRampToValueAtTime(200, now + 0.15);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.2);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            } else if (type === 'kill') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(250, now);
+                osc.frequency.exponentialRampToValueAtTime(80, now + 0.2);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.22);
+                osc.start(now);
+                osc.stop(now + 0.22);
+            } else if (type === 'victory') {
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(523.25, now); // C5
+                osc.frequency.setValueAtTime(659.25, now + 0.1); // E5
+                osc.frequency.setValueAtTime(783.99, now + 0.2); // G5
+                osc.frequency.setValueAtTime(1046.50, now + 0.3); // C6
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.5);
+                osc.start(now);
+                osc.stop(now + 0.5);
+            } else if (type === 'gameover') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(400, now);
+                osc.frequency.exponentialRampToValueAtTime(100, now + 0.4);
+                gain.gain.setValueAtTime(0.25, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.45);
+                osc.start(now);
+                osc.stop(now + 0.45);
+            }
+        } catch (e) {
+            // Audio context fallback safeguard
+        }
+    }
+
+    // --- Settings & Storage Handlers ---
+    loadSettings() {
+        this.settings = JSON.parse(localStorage.getItem('tr_settings') || JSON.stringify({
+            soundFx: true,
+            music: true,
+            vibration: true,
+            gfxQuality: 'high',
+            speedMode: 'normal',
+            controlMode: 'keyboard'
+        }));
+        this.setSpeedMode(this.settings.speedMode);
+        this.setControlMode(this.settings.controlMode);
+        this.updateSettingsUI();
+    }
+
+    saveSettings() {
+        localStorage.setItem('tr_settings', JSON.stringify(this.settings));
+        this.updateSettingsUI();
+    }
+
+    updateSettingsUI() {
+        const sfxBtn = document.getElementById('toggle-sfx');
+        const musicBtn = document.getElementById('toggle-music');
+        const vibeBtn = document.getElementById('toggle-vibe');
+
+        if (sfxBtn) { sfxBtn.textContent = this.settings.soundFx ? 'ON' : 'OFF'; sfxBtn.className = this.settings.soundFx ? 'btn-toggle active' : 'btn-toggle'; }
+        if (musicBtn) { musicBtn.textContent = this.settings.music ? 'ON' : 'OFF'; musicBtn.className = this.settings.music ? 'btn-toggle active' : 'btn-toggle'; }
+        if (vibeBtn) { vibeBtn.textContent = this.settings.vibration ? 'ON' : 'OFF'; vibeBtn.className = this.settings.vibration ? 'btn-toggle active' : 'btn-toggle'; }
+
+        document.querySelectorAll('.gfx-btn').forEach(btn => {
+            if (btn.getAttribute('data-gfx') === this.settings.gfxQuality) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+    }
+
+    loadSkinsData() {
+        this.availableSkins = [
+            { id: 'classic', name: 'Classic Cyan', color: '#00E5FF', price: 0, unlocked: true },
+            { id: 'neon', name: 'Neon Pink', color: '#FF2D55', price: 0, unlocked: true },
+            { id: 'gold', name: 'Gold Yellow', color: '#FFCC00', price: 500, unlocked: false },
+            { id: 'emerald', name: 'Emerald Green', color: '#00E676', price: 1000, unlocked: false },
+            { id: 'ocean', name: 'Ocean Blue', color: '#0284C7', price: 1500, unlocked: false },
+            { id: 'galaxy', name: 'Galaxy Purple', color: '#AF52DE', price: 2500, unlocked: false }
+        ];
+
+        const savedUnlocked = JSON.parse(localStorage.getItem('tr_unlocked_skins') || '["classic", "neon"]');
+        this.availableSkins.forEach(s => {
+            if (savedUnlocked.includes(s.id)) s.unlocked = true;
+        });
+
+        this.selectedSkinId = localStorage.getItem('tr_selected_skin') || 'classic';
+        this.renderSkinsGrid();
+        this.updateSkinPreviewUI();
+    }
+
+    saveSkinsData() {
+        const unlockedIds = this.availableSkins.filter(s => s.unlocked).map(s => s.id);
+        localStorage.setItem('tr_unlocked_skins', JSON.stringify(unlockedIds));
+        localStorage.setItem('tr_selected_skin', this.selectedSkinId);
+        this.renderSkinsGrid();
+        this.updateSkinPreviewUI();
+    }
+
+    loadAchievementsData() {
+        this.achievements = [
+            { id: 'first_win', name: 'First Victory', desc: 'Win 1st Place in a match', icon: '🏆', unlocked: false },
+            { id: 'killer_10', name: 'Killer', desc: 'Eliminate 10 rivals in total', icon: '⚔️', unlocked: false },
+            { id: 'territory_25', name: 'Territory Master', desc: 'Capture 25% territory in a match', icon: '🌎', unlocked: false },
+            { id: 'coin_1000', name: 'Coin Collector', desc: 'Accumulate 1,000 total gold coins', icon: '💰', unlocked: false },
+            { id: 'survivor_3m', name: 'Survivor', desc: 'Survive for 3 minutes in a match', icon: '🔥', unlocked: false },
+            { id: 'high_scorer', name: 'High Scorer', desc: 'Reach 5,000 points in a match', icon: '⭐', unlocked: false }
+        ];
+
+        const saved = JSON.parse(localStorage.getItem('tr_achievements') || '[]');
+        this.achievements.forEach(a => {
+            if (saved.includes(a.id)) a.unlocked = true;
+        });
+        this.renderAchievementsGrid();
+    }
+
+    triggerAchievement(id) {
+        const ach = this.achievements.find(a => a.id === id);
+        if (ach && !ach.unlocked) {
+            ach.unlocked = true;
+            const saved = JSON.parse(localStorage.getItem('tr_achievements') || '[]');
+            if (!saved.includes(id)) saved.push(id);
+            localStorage.setItem('tr_achievements', JSON.stringify(saved));
+            this.renderAchievementsGrid();
+            this.playSound('victory');
+            this.addKillToast(`🏅 <b>ACHIEVEMENT UNLOCKED:</b> ${ach.name}!`);
+        }
+    }
+
+    loadStatsData() {
+        this.stats = JSON.parse(localStorage.getItem('tr_stats') || JSON.stringify({
+            totalMatches: 0,
+            totalWins: 0,
+            bestScore: 0,
+            bestTerritory: 0,
+            totalKills: 0,
+            totalCoins: 1250,
+            sumScores: 0,
+            sumTerritories: 0
+        }));
+        this.updateCoinsUI();
+        this.renderStatsModal();
+    }
+
+    saveStatsData() {
+        localStorage.setItem('tr_stats', JSON.stringify(this.stats));
+        this.updateCoinsUI();
+        this.renderStatsModal();
+    }
+
+    updateCoinsUI() {
+        const elem = document.getElementById('coinsText');
+        if (elem) elem.textContent = this.stats.totalCoins.toLocaleString();
+    }
+
+    addCoins(amount) {
+        this.stats.totalCoins += amount;
+        if (this.stats.totalCoins >= 1000) this.triggerAchievement('coin_1000');
+        this.saveStatsData();
     }
 
     setSpeedMode(mode) {
@@ -83,10 +329,12 @@ class PaperIOGame {
         const speedMap = { slow: 130, normal: 95, fast: 60 };
         this.baseStepDelay = speedMap[mode] || 95;
         this.stepDelay = this.baseStepDelay;
-        localStorage.setItem('paperio_speed_mode', mode);
+        if (this.settings) {
+            this.settings.speedMode = mode;
+            this.saveSettings();
+        }
 
-        const speedBtns = document.querySelectorAll('.speed-btn');
-        speedBtns.forEach(btn => {
+        document.querySelectorAll('.speed-btn').forEach(btn => {
             if (btn.getAttribute('data-speed') === mode) {
                 btn.classList.add('active');
             } else {
@@ -97,10 +345,12 @@ class PaperIOGame {
 
     setControlMode(mode) {
         this.controlMode = mode;
-        localStorage.setItem('paperio_control_mode', mode);
+        if (this.settings) {
+            this.settings.controlMode = mode;
+            this.saveSettings();
+        }
 
-        const ctrlBtns = document.querySelectorAll('.ctrl-mode-btn');
-        ctrlBtns.forEach(btn => {
+        document.querySelectorAll('.ctrl-mode-btn').forEach(btn => {
             if (btn.getAttribute('data-mode') === mode) {
                 btn.classList.add('active');
             } else {
@@ -124,10 +374,10 @@ class PaperIOGame {
     }
 
     setupPlayers() {
-        const savedName = localStorage.getItem('paperio_player_name') || 'Player';
-        const savedColor = localStorage.getItem('paperio_player_color') || '#00E5FF';
+        const savedName = localStorage.getItem('tr_player_name') || 'Player';
+        const activeSkin = this.availableSkins.find(s => s.id === this.selectedSkinId) || this.availableSkins[0];
 
-        this.humanPlayer = new Player(1, savedName, false, savedColor, "#DC2626", savedColor);
+        this.humanPlayer = new Player(1, savedName, false, activeSkin.color, activeSkin.color, activeSkin.color, activeSkin.id);
         this.players = [
             this.humanPlayer,
             new Player(2, "Estella", true, "#E040FB", "#C084FC", "#E040FB"),
@@ -158,10 +408,10 @@ class PaperIOGame {
         if (color) {
             this.humanPlayer.color = color;
             this.humanPlayer.territoryColor = color;
+            this.humanPlayer.trailColor = color;
         }
         const saveName = name.trim() || 'Player';
-        localStorage.setItem('paperio_player_name', saveName);
-        if (color) localStorage.setItem('paperio_player_color', color);
+        localStorage.setItem('tr_player_name', saveName);
         this.updateProfileHUD(updateInput);
     }
 
@@ -173,6 +423,7 @@ class PaperIOGame {
             }
         }
 
+        this.spawnedItems = [];
         this.isGameOver = false;
         this.isPaused = false;
         this.gameStarted = true;
@@ -184,7 +435,7 @@ class PaperIOGame {
         document.getElementById('pauseOverlay').classList.add('hidden');
         document.getElementById('startOverlay').classList.add('hidden');
 
-        // Spawn Locations evenly distributed on 140x140 arena map
+        // Spawn Locations distributed on arena map
         const spawns = [
             { x: 30, y: 30 },
             { x: 110, y: 110 },
@@ -195,11 +446,16 @@ class PaperIOGame {
             { x: 110, y: 70 }
         ];
 
+        const activeSkin = this.availableSkins.find(s => s.id === this.selectedSkinId) || this.availableSkins[0];
+        this.humanPlayer.color = activeSkin.color;
+        this.humanPlayer.territoryColor = activeSkin.color;
+        this.humanPlayer.trailColor = activeSkin.color;
+
         this.players.forEach((p, idx) => {
             let s = spawns[idx % spawns.length];
             p.x = s.x;
             p.y = s.y;
-            p.vx = 0; // Wait for player directional input before moving
+            p.vx = 0;
             p.vy = 0;
             p.trail = [];
             p.isOutside = false;
@@ -210,12 +466,17 @@ class PaperIOGame {
             p.maxPercentage = initPct;
             p.finalPercentage = initPct;
             p.kills = 0;
+            p.coins = 0;
+            p.score = 0;
             p.deathReason = "";
             p.killedBy = "";
+            p.shieldActive = false;
+            p.magnetActive = false;
+            p.speedBoostActive = false;
             p.aiExcursion = 0;
             p.aiMaxExcursion = 8 + Math.floor(Math.random() * 8);
 
-            // Initial 9x9 Base (radius 4)
+            // Initial 9x9 Base
             for (let dx = -4; dx <= 4; dx++) {
                 for (let dy = -4; dy <= 4; dy++) {
                     let tx = p.x + dx;
@@ -227,9 +488,95 @@ class PaperIOGame {
             }
         });
 
+        this.spawnMapItems(6); // Initial coins & power-ups spawn
         this.updateStats();
         this.renderUI();
-        this.addKillToast(`🎮 <b>Match Started!</b> Conquer the arena!`);
+        this.addKillToast(`🎮 <b>TERRITORY RUSH STARTED!</b> Capture territory & collect power-ups!`);
+    }
+
+    // --- Collectible Canvas Power-Ups & Items Generator ---
+    spawnMapItems(count = 3) {
+        const types = ['coin', 'coin', 'coin', 'speed', 'shield', 'magnet', 'dash'];
+        for (let i = 0; i < count; i++) {
+            let rx = 10 + Math.floor(Math.random() * (GRID - 20));
+            let ry = 10 + Math.floor(Math.random() * (GRID - 20));
+            let type = types[Math.floor(Math.random() * types.length)];
+            this.spawnedItems.push({ x: rx, y: ry, type: type, id: Math.random() });
+        }
+    }
+
+    activatePowerup(p, type) {
+        if (type === 'coin') {
+            const amount = 25 + Math.floor(Math.random() * 50);
+            p.coins += amount;
+            this.addCoins(amount);
+            this.playSound('coin');
+            this.addKillToast(`🪙 <b>+${amount} Gold Coins Collected!</b>`);
+        } else if (type === 'speed') {
+            p.speedBoostActive = true;
+            this.stepDelay = Math.max(35, Math.floor(this.baseStepDelay * 0.5));
+            this.showPowerupHUD('⚡', 'Speed Boost', 6);
+            this.playSound('powerup');
+            this.addKillToast(`⚡ <b>SPEED BOOST ACTIVATED!</b> (6s)`);
+
+            if (p.speedBoostTimer) clearTimeout(p.speedBoostTimer);
+            p.speedBoostTimer = setTimeout(() => {
+                p.speedBoostActive = false;
+                this.stepDelay = this.baseStepDelay;
+                this.hidePowerupHUD();
+            }, 6000);
+        } else if (type === 'shield') {
+            p.shieldActive = true;
+            this.showPowerupHUD('🛡️', 'Shield Invincibility', 6);
+            this.playSound('powerup');
+            this.addKillToast(`🛡️ <b>SHIELD ACTIVATED!</b> Protected from cut! (6s)`);
+
+            if (p.shieldTimer) clearTimeout(p.shieldTimer);
+            p.shieldTimer = setTimeout(() => {
+                p.shieldActive = false;
+                this.hidePowerupHUD();
+            }, 6000);
+        } else if (type === 'magnet') {
+            p.magnetActive = true;
+            this.showPowerupHUD('🧲', 'Coin Magnet', 8);
+            this.playSound('powerup');
+            this.addKillToast(`🧲 <b>COIN MAGNET ACTIVATED!</b> (8s)`);
+
+            if (p.magnetTimer) clearTimeout(p.magnetTimer);
+            p.magnetTimer = setTimeout(() => {
+                p.magnetActive = false;
+                this.hidePowerupHUD();
+            }, 8000);
+        } else if (type === 'dash') {
+            this.performDash(p);
+        }
+    }
+
+    performDash(p) {
+        if (!p.isAlive || (p.vx === 0 && p.vy === 0)) return;
+        this.playSound('powerup');
+        this.addKillToast(`💨 <b>INSTANT DASH SURGE!</b>`);
+        for (let step = 0; step < 3; step++) {
+            if (p.isAlive) this.movePlayer(p);
+        }
+    }
+
+    showPowerupHUD(icon, name, seconds) {
+        const container = document.getElementById('activePowerupContainer');
+        const iconElem = document.getElementById('powerupIcon');
+        const nameElem = document.getElementById('powerupName');
+        const timerElem = document.getElementById('powerupTimer');
+
+        if (!container) return;
+        if (iconElem) iconElem.textContent = icon;
+        if (nameElem) nameElem.textContent = name;
+        if (timerElem) timerElem.textContent = `${seconds}s`;
+        container.classList.remove('hidden');
+    }
+
+    hidePowerupHUD() {
+        const container = document.getElementById('activePowerupContainer');
+        if (container) container.classList.add('hidden');
     }
 
     showStartOverlay() {
@@ -244,6 +591,7 @@ class PaperIOGame {
         if (!this.gameStarted || this.isGameOver) return;
         this.isPaused = true;
         document.getElementById('pauseOverlay').classList.remove('hidden');
+        this.playSound('click');
         this.addKillToast(`⏸ <b>Game Paused</b>`);
     }
 
@@ -251,6 +599,7 @@ class PaperIOGame {
         this.isPaused = false;
         this.lastTimerTick = performance.now();
         document.getElementById('pauseOverlay').classList.add('hidden');
+        this.playSound('click');
         this.addKillToast(`▶ <b>Resumed Match!</b>`);
     }
 
@@ -267,9 +616,9 @@ class PaperIOGame {
     }
 
     bindControls() {
-        // Mouse Cursor Steering Controls (Only active if Mouse Follow mode is selected)
+        // Mouse Cursor Steering
         window.addEventListener('mousemove', (e) => {
-            if (this.controlMode !== 'mouse') return; // Ignore mouse movements in Keyboard & D-Pad mode!
+            if (this.controlMode !== 'mouse') return;
             if (!this.humanPlayer || !this.humanPlayer.isAlive || this.isPaused || !this.gameStarted) return;
             const centerX = window.innerWidth / 2;
             const centerY = window.innerHeight / 2;
@@ -293,15 +642,18 @@ class PaperIOGame {
             }
         });
 
-        // Keyboard Controls for User Player & Pause
+        // Keyboard Controls
         window.addEventListener('keydown', (e) => {
             const key = e.key ? e.key.toLowerCase() : '';
             if (key === 'p' || key === 'escape') {
                 this.togglePause();
                 return;
             }
+            if (key === ' ') {
+                this.performDash(this.humanPlayer);
+                return;
+            }
 
-            // Prevent browser window scroll when using arrow keys / WASD during gameplay
             if (['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd', ' '].includes(key)) {
                 if (document.activeElement && document.activeElement.tagName !== 'INPUT') {
                     e.preventDefault();
@@ -321,7 +673,7 @@ class PaperIOGame {
             }
         });
 
-        // On-Screen D-Pad Controls for Mouse Click / Touch
+        // D-Pad Touch Controls
         const setUp = () => { if (this.humanPlayer && this.humanPlayer.vy !== 1 && !this.isPaused) { this.humanPlayer.vx = 0; this.humanPlayer.vy = -1; } };
         const setDown = () => { if (this.humanPlayer && this.humanPlayer.vy !== -1 && !this.isPaused) { this.humanPlayer.vx = 0; this.humanPlayer.vy = 1; } };
         const setLeft = () => { if (this.humanPlayer && this.humanPlayer.vx !== 1 && !this.isPaused) { this.humanPlayer.vx = -1; this.humanPlayer.vy = 0; } };
@@ -331,6 +683,7 @@ class PaperIOGame {
         document.getElementById('btn-down')?.addEventListener('click', setDown);
         document.getElementById('btn-left')?.addEventListener('click', setLeft);
         document.getElementById('btn-right')?.addEventListener('click', setRight);
+        document.getElementById('btn-hud-powerup')?.addEventListener('click', () => this.performDash(this.humanPlayer));
 
         // HUD Pause & Resume & Menu Buttons
         document.getElementById('btn-pause-hud')?.addEventListener('click', () => this.pauseGame());
@@ -338,8 +691,12 @@ class PaperIOGame {
         document.getElementById('btn-restart-paused')?.addEventListener('click', () => this.startNewMatch());
         document.getElementById('btn-main-menu-paused')?.addEventListener('click', () => this.showStartOverlay());
         document.getElementById('btn-main-menu-gameover')?.addEventListener('click', () => this.showStartOverlay());
+        document.getElementById('btn-gameover-leaderboard')?.addEventListener('click', () => {
+            document.getElementById('gameOverlay').classList.add('hidden');
+            this.openDBModal();
+        });
 
-        // Zoom Slider & Zoom Buttons & Mouse Wheel Zoom
+        // Zoom Controls
         const zoomSlider = document.getElementById('zoomSlider');
         if (zoomSlider) {
             zoomSlider.addEventListener('input', (e) => {
@@ -350,16 +707,12 @@ class PaperIOGame {
         document.getElementById('btn-zoom-out')?.addEventListener('click', () => this.setZoom(this.zoomScale - 0.15));
 
         window.addEventListener('wheel', (e) => {
-            if (e.target.closest('#dbModal') || e.target.closest('#gameOverlay') || e.target.closest('#startOverlay')) return;
+            if (e.target.closest('.modal') || e.target.closest('.overlay')) return;
             e.preventDefault();
-            if (e.deltaY > 0) {
-                this.setZoom(this.zoomScale - 0.05);
-            } else {
-                this.setZoom(this.zoomScale + 0.05);
-            }
+            this.setZoom(e.deltaY > 0 ? this.zoomScale - 0.05 : this.zoomScale + 0.05);
         }, { passive: false });
 
-        // Profile Editor Listeners
+        // Nickname Input Listeners
         const nameInput = document.getElementById('playerNameInput');
         const validationMsg = document.getElementById('nameValidationMsg');
 
@@ -369,109 +722,119 @@ class PaperIOGame {
                 if (validationMsg) validationMsg.classList.add('hidden');
                 this.saveProfile(e.target.value, null, false);
             });
-            nameInput.addEventListener('focus', () => {
-                nameInput.select();
-            });
-            nameInput.addEventListener('keydown', (e) => {
-                e.stopPropagation();
-            });
+            nameInput.addEventListener('focus', () => nameInput.select());
+            nameInput.addEventListener('keydown', (e) => e.stopPropagation());
         }
 
-        const clearBtn = document.getElementById('btn-clear-name');
-        if (clearBtn && nameInput) {
-            clearBtn.addEventListener('click', (e) => {
-                e.stopPropagation();
+        document.getElementById('btn-clear-name')?.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (nameInput) {
                 nameInput.value = '';
                 nameInput.focus();
                 this.saveProfile('', null, false);
-            });
-        }
-
-        const colorBtns = document.querySelectorAll('.color-btn');
-        colorBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
-                colorBtns.forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                const selectedColor = btn.getAttribute('data-color');
-                this.saveProfile(this.humanPlayer.name, selectedColor, false);
-            });
+            }
         });
 
-        const speedBtns = document.querySelectorAll('.speed-btn');
-        speedBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
-                const mode = btn.getAttribute('data-speed');
-                this.setSpeedMode(mode);
-            });
+        document.querySelectorAll('.speed-btn').forEach(btn => {
+            btn.addEventListener('click', () => this.setSpeedMode(btn.getAttribute('data-speed')));
         });
 
-        const ctrlBtns = document.querySelectorAll('.ctrl-mode-btn');
-        ctrlBtns.forEach(btn => {
-            btn.addEventListener('click', () => {
-                const mode = btn.getAttribute('data-mode');
-                this.setControlMode(mode);
-            });
+        document.querySelectorAll('.ctrl-mode-btn').forEach(btn => {
+            btn.addEventListener('click', () => this.setControlMode(btn.getAttribute('data-mode')));
         });
 
-        const openProfileEditor = () => {
-            this.gameStarted = false;
-            document.getElementById('startOverlay').classList.remove('hidden');
-            setTimeout(() => document.getElementById('playerNameInput')?.focus(), 100);
-        };
-
-        document.getElementById('btn-edit-profile')?.addEventListener('click', (e) => {
-            e.stopPropagation();
-            openProfileEditor();
-        });
-
-        document.querySelector('.profile-pill')?.addEventListener('click', openProfileEditor);
-
-        // Start Game Button with Nickname Validation
+        // Start Game CTA Button
         const startBtn = document.getElementById('btn-start-play');
         if (startBtn) {
             startBtn.onclick = () => {
-                const inputElem = document.getElementById('playerNameInput');
-                const val = inputElem ? inputElem.value.trim() : '';
+                this.playSound('click');
+                const val = nameInput ? nameInput.value.trim() : '';
 
                 if (!val) {
-                    if (inputElem) inputElem.classList.add('input-error');
+                    if (nameInput) nameInput.classList.add('input-error');
                     if (validationMsg) validationMsg.classList.remove('hidden');
-                    if (inputElem) inputElem.focus();
+                    if (nameInput) nameInput.focus();
                     return;
                 }
 
-                if (inputElem) inputElem.classList.remove('input-error');
+                if (nameInput) nameInput.classList.remove('input-error');
                 if (validationMsg) validationMsg.classList.add('hidden');
 
-                const activeColorBtn = document.querySelector('.color-btn.active');
-                const col = activeColorBtn ? activeColorBtn.getAttribute('data-color') : null;
-
-                if (document.activeElement) document.activeElement.blur();
-                window.focus();
-                this.saveProfile(val, col, true);
+                this.saveProfile(val, null, true);
                 this.startNewMatch();
             };
         }
 
-        document.getElementById('btn-restart').onclick = () => this.startNewMatch();
-        document.getElementById('btn-daily-reward')?.addEventListener('click', () => {
-            document.getElementById('rewardModal').classList.remove('hidden');
+        document.getElementById('btn-restart').onclick = () => {
+            this.playSound('click');
+            this.startNewMatch();
+        };
+
+        // Main Arcade Screen Modal Buttons
+        this.bindModalButtons();
+    }
+
+    bindModalButtons() {
+        const openModal = (id) => {
+            this.playSound('click');
+            document.getElementById(id)?.classList.remove('hidden');
+        };
+
+        const closeModal = (id) => {
+            this.playSound('click');
+            document.getElementById(id)?.classList.add('hidden');
+        };
+
+        document.getElementById('btn-menu-skins')?.addEventListener('click', () => openModal('skinsModal'));
+        document.getElementById('btn-open-skins-quick')?.addEventListener('click', () => openModal('skinsModal'));
+        document.getElementById('btn-menu-leaderboard')?.addEventListener('click', () => this.openDBModal());
+        document.getElementById('btn-db-modal')?.addEventListener('click', () => this.openDBModal());
+        document.getElementById('btn-menu-stats')?.addEventListener('click', () => openModal('statsModal'));
+        document.getElementById('btn-menu-achievements')?.addEventListener('click', () => openModal('achievementsModal'));
+        document.getElementById('btn-menu-daily')?.addEventListener('click', () => this.openDailyRewardModal());
+        document.getElementById('btn-menu-howto')?.addEventListener('click', () => openModal('howtoModal'));
+        document.getElementById('btn-menu-settings')?.addEventListener('click', () => openModal('settingsModal'));
+        document.getElementById('btn-settings-paused')?.addEventListener('click', () => openModal('settingsModal'));
+
+        document.querySelectorAll('.close-modal-btn').forEach(btn => {
+            btn.addEventListener('click', () => closeModal(btn.getAttribute('data-target')));
         });
-        document.getElementById('btn-claim-reward')?.addEventListener('click', () => {
-            document.getElementById('rewardModal').classList.add('hidden');
-            this.claimDailyReward();
+
+        // Claim Daily Reward
+        document.getElementById('btn-claim-reward')?.addEventListener('click', () => this.claimDailyReward());
+
+        // Settings Toggles
+        document.getElementById('toggle-sfx')?.addEventListener('click', () => {
+            this.settings.soundFx = !this.settings.soundFx;
+            this.saveSettings();
+            this.playSound('click');
         });
-        document.getElementById('btn-speed-boost')?.addEventListener('click', () => {
-            this.activateSpeedBoost();
+        document.getElementById('toggle-music')?.addEventListener('click', () => {
+            this.settings.music = !this.settings.music;
+            this.saveSettings();
+            this.playSound('click');
         });
-        document.getElementById('btn-db-modal').onclick = () => this.openDBModal();
-        document.getElementById('btn-close-modal').onclick = () => document.getElementById('dbModal').classList.add('hidden');
-        
-        window.addEventListener('click', (e) => {
-            const dbModal = document.getElementById('dbModal');
-            const rewardModal = document.getElementById('rewardModal');
-            if (e.target === dbModal) dbModal.classList.add('hidden');
-            if (e.target === rewardModal) rewardModal.classList.add('hidden');
+        document.getElementById('toggle-vibe')?.addEventListener('click', () => {
+            this.settings.vibration = !this.settings.vibration;
+            this.saveSettings();
+            this.playSound('click');
+        });
+
+        document.querySelectorAll('.gfx-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                this.settings.gfxQuality = btn.getAttribute('data-gfx');
+                this.saveSettings();
+                this.playSound('click');
+            });
+        });
+
+        // Reset Progress Modal
+        document.getElementById('btn-reset-progress')?.addEventListener('click', () => openModal('confirmResetModal'));
+        document.getElementById('btn-cancel-reset')?.addEventListener('click', () => closeModal('confirmResetModal'));
+        document.getElementById('btn-confirm-reset')?.addEventListener('click', () => {
+            localStorage.clear();
+            closeModal('confirmResetModal');
+            location.reload();
         });
     }
 
@@ -481,12 +844,20 @@ class PaperIOGame {
         if (!this.lastStepTime) this.lastStepTime = now;
         const delta = now - this.lastStepTime;
 
-        // Timer Tick Increment (Every 1 second when active & not paused)
         if (this.gameStarted && !this.isPaused && !this.isGameOver) {
             if (now - this.lastTimerTick >= 1000) {
                 this.elapsedSeconds++;
                 this.lastTimerTick = now;
                 this.updateTimerDisplay();
+
+                if (this.elapsedSeconds >= 180) this.triggerAchievement('survivor_3m');
+
+                // Periodically spawn canvas items every 10s
+                this.itemSpawnTimer++;
+                if (this.itemSpawnTimer >= 10) {
+                    this.itemSpawnTimer = 0;
+                    if (this.spawnedItems.length < 12) this.spawnMapItems(2);
+                }
             }
         }
 
@@ -520,28 +891,50 @@ class PaperIOGame {
             this.movePlayer(ai);
         });
 
-        // 3. Collision Checks & Game Over Evaluation
+        // 3. Collectible Item Pickups & Magnet Effect
+        this.checkItemPickups();
+
+        // 4. Collisions & Game Over Evaluation
         this.checkCollisions();
         this.updateStats();
         this.renderUI();
         this.checkGameOver();
     }
 
+    checkItemPickups() {
+        if (!this.humanPlayer || !this.humanPlayer.isAlive) return;
+
+        this.spawnedItems = this.spawnedItems.filter(item => {
+            let dist = Math.abs(this.humanPlayer.x - item.x) + Math.abs(this.humanPlayer.y - item.y);
+
+            // Magnet Attraction Effect
+            if (this.humanPlayer.magnetActive && dist <= 12) {
+                if (item.x < this.humanPlayer.x) item.x++;
+                else if (item.x > this.humanPlayer.x) item.x--;
+                if (item.y < this.humanPlayer.y) item.y++;
+                else if (item.y > this.humanPlayer.y) item.y--;
+                dist = Math.abs(this.humanPlayer.x - item.x) + Math.abs(this.humanPlayer.y - item.y);
+            }
+
+            if (dist <= 1) {
+                this.activatePowerup(this.humanPlayer, item.type);
+                return false; // Remove collected item
+            }
+            return true;
+        });
+    }
+
     updateAIMovement(ai) {
         let isOwner = (this.grid[ai.x][ai.y] === ai.id);
 
-        // 1. Boundary Wall Avoidance (Steer away if approaching map borders)
         const wallMargin = 5;
         if (ai.x <= wallMargin && ai.vx < 0) { ai.vx = 0; ai.vy = ai.y > GRID / 2 ? -1 : 1; return; }
         if (ai.x >= GRID - wallMargin && ai.vx > 0) { ai.vx = 0; ai.vy = ai.y > GRID / 2 ? -1 : 1; return; }
         if (ai.y <= wallMargin && ai.vy < 0) { ai.vy = 0; ai.vx = ai.x > GRID / 2 ? -1 : 1; return; }
         if (ai.y >= GRID - wallMargin && ai.vy > 0) { ai.vy = 0; ai.vx = ai.x > GRID / 2 ? -1 : 1; return; }
 
-        // 2. Excursion Control
         if (!ai.isOutside && isOwner) {
-            // Inside home base: venture out in a safe cardinal direction
             let dirs = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }];
-            // Filter directions that don't immediately hit a wall
             dirs = dirs.filter(d => this.isValid(ai.x + d.x * 4, ai.y + d.y * 4));
             if (dirs.length > 0) {
                 let choice = dirs[Math.floor(Math.random() * dirs.length)];
@@ -553,10 +946,8 @@ class PaperIOGame {
             ai.aiExcursion++;
 
             if (ai.aiExcursion >= ai.aiMaxExcursion) {
-                // Time to turn back towards home base
                 this.steerAITowardsHome(ai);
             } else if (Math.random() < 0.15) {
-                // Turn 90 degrees safely (avoiding immediate 180-degree self-collisions)
                 let candVx = 0, candVy = 0;
                 if (ai.vx !== 0) {
                     candVy = Math.random() < 0.5 ? 1 : -1;
@@ -566,7 +957,6 @@ class PaperIOGame {
                     candVy = 0;
                 }
 
-                // Check target cell is valid and NOT own trail
                 let tx = ai.x + candVx;
                 let ty = ai.y + candVy;
                 if (this.isValid(tx, ty) && this.trailGrid[tx][ty] !== ai.id) {
@@ -578,7 +968,6 @@ class PaperIOGame {
     }
 
     steerAITowardsHome(ai) {
-        // Find closest owned territory cell for AI
         let bestDist = 999;
         let target = null;
         for (let x = 0; x < GRID; x += 4) {
@@ -606,7 +995,6 @@ class PaperIOGame {
                 candVx = 0;
             }
 
-            // Verify steer target doesn't walk straight into own trail
             let tx = ai.x + candVx;
             let ty = ai.y + candVy;
             if (this.isValid(tx, ty) && this.trailGrid[tx][ty] !== ai.id) {
@@ -620,7 +1008,6 @@ class PaperIOGame {
         let nx = p.x + p.vx;
         let ny = p.y + p.vy;
 
-        // Wall Border Collision
         if (!this.isValid(nx, ny)) {
             p.deathReason = "crashed into map border";
             this.eliminatePlayer(p, null, "crashed into map border");
@@ -630,25 +1017,33 @@ class PaperIOGame {
         p.x = nx;
         p.y = ny;
 
-        // Check if player/AI steps on another player's active trail (TRAIL CUT ELIMINATION)
         let existingTrailOwner = this.trailGrid[nx][ny];
         if (existingTrailOwner > 0 && existingTrailOwner !== p.id) {
             let victim = this.players.find(v => v.id === existingTrailOwner);
             if (victim && victim.isAlive) {
-                victim.killedBy = p.name;
-                victim.deathReason = "trail cut";
-                p.kills++;
-                this.eliminatePlayer(victim, p, "trail cut");
+                // Shield Invincibility Check
+                if (victim.shieldActive) {
+                    victim.shieldActive = false;
+                    this.playSound('shield_save');
+                    this.addKillToast(`🛡️ <b>SHIELD SAVED ${victim.name.toUpperCase()}!</b>`);
+                } else {
+                    victim.killedBy = p.name;
+                    victim.deathReason = "trail cut";
+                    p.kills++;
+                    if (p === this.humanPlayer) {
+                        this.playSound('kill');
+                        if (p.kills >= 10) this.triggerAchievement('killer_10');
+                    }
+                    this.eliminatePlayer(victim, p, "trail cut");
+                }
             }
         }
 
         let currentOwner = this.grid[nx][ny];
 
         if (currentOwner !== p.id) {
-            // Player is outside home territory drawing a trail
             p.isOutside = true;
 
-            // Self-Collision (stepping on own trail)
             if (this.trailGrid[nx][ny] === p.id) {
                 p.deathReason = "self-collision";
                 this.eliminatePlayer(p, p, "self-collision");
@@ -658,7 +1053,6 @@ class PaperIOGame {
             p.trail.push({ x: nx, y: ny });
             this.trailGrid[nx][ny] = p.id;
         } else {
-            // Player returned safely to home territory -> Capture Enclosed Area!
             if (p.isOutside) {
                 this.performCapture(p);
                 p.isOutside = false;
@@ -671,17 +1065,14 @@ class PaperIOGame {
         let pId = p.id;
         let prevPct = p.percentage;
 
-        // 1. Convert active trail to owned territory
         p.trail.forEach(pt => {
             this.grid[pt.x][pt.y] = pId;
             this.trailGrid[pt.x][pt.y] = 0;
         });
 
-        // 2. Perimeter BFS Flood Fill to capture enclosed area
         let visited = Array(GRID).fill(false).map(() => Array(GRID).fill(false));
         let queue = [];
 
-        // Push map borders into BFS queue if not owned by player
         for (let x = 0; x < GRID; x++) {
             if (this.grid[x][0] !== pId) { visited[x][0] = true; queue.push({ x, y: 0 }); }
             if (this.grid[x][GRID - 1] !== pId) { visited[x][GRID - 1] = true; queue.push({ x: x, y: GRID - 1 }); }
@@ -691,7 +1082,6 @@ class PaperIOGame {
             if (this.grid[GRID - 1][y] !== pId) { visited[GRID - 1][y] = true; queue.push({ x: GRID - 1, y }); }
         }
 
-        // BFS traversal for all exterior uncaptured cells
         while (queue.length > 0) {
             let curr = queue.shift();
             let dirs = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }];
@@ -705,7 +1095,6 @@ class PaperIOGame {
             });
         }
 
-        // 3. Any cell not visited by exterior flood fill is enclosed -> Claim it!
         let newlyClaimed = 0;
         for (let x = 0; x < GRID; x++) {
             for (let y = 0; y < GRID; y++) {
@@ -719,40 +1108,23 @@ class PaperIOGame {
 
         this.updateStats();
         let gainedPct = (p.percentage - prevPct).toFixed(2);
-        if (p === this.humanPlayer && gainedPct > 0.1) {
-            this.addKillToast(`✨ <b>Captured +${gainedPct}% Territory!</b>`);
+        if (p === this.humanPlayer) {
+            if (gainedPct > 0.1) {
+                this.playSound('capture');
+                this.addKillToast(`✨ <b>Captured +${gainedPct}% Territory!</b>`);
+            }
+            if (p.percentage >= 25.0) this.triggerAchievement('territory_25');
         }
     }
 
     checkCollisions() {
         this.players.filter(p => p.isAlive).forEach(p => {
-            // Check Head-to-Head Collisions
             this.players.filter(other => other.isAlive && other.id !== p.id).forEach(other => {
                 if (p.x === other.x && p.y === other.y) {
-                    if (p.isOutside && !other.isOutside) {
-                        p.deathReason = "head-to-head collision";
-                        this.eliminatePlayer(p, other, "head-to-head collision");
-                    } else if (!p.isOutside && other.isOutside) {
-                        other.deathReason = "head-to-head collision";
-                        this.eliminatePlayer(other, p, "head-to-head collision");
-                    } else {
-                        p.deathReason = "head-to-head collision";
-                        this.eliminatePlayer(p, other, "head-to-head collision");
-                    }
+                    p.deathReason = "head-to-head collision";
+                    this.eliminatePlayer(p, other, "head-to-head collision");
                 }
             });
-
-            // Check Trail Cutting Collisions
-            let trailOwnerId = this.trailGrid[p.x][p.y];
-            if (trailOwnerId > 0 && trailOwnerId !== p.id) {
-                let victim = this.players.find(v => v.id === trailOwnerId);
-                if (victim && victim.isAlive) {
-                    victim.killedBy = p.name;
-                    victim.deathReason = "trail cut";
-                    p.kills++;
-                    this.eliminatePlayer(victim, p, "trail cut");
-                }
-            }
         });
     }
 
@@ -761,7 +1133,6 @@ class PaperIOGame {
         victim.vx = 0;
         victim.vy = 0;
 
-        // Calculate victim's territory percentage at the moment of elimination BEFORE clearing grid
         let totalCells = GRID * GRID;
         let count = 0;
         for (let x = 0; x < GRID; x++) {
@@ -771,14 +1142,9 @@ class PaperIOGame {
         }
         let currentPct = (count / totalCells) * 100.0;
         victim.finalPercentage = Math.max(currentPct, victim.percentage, victim.maxPercentage);
-        if (victim.finalPercentage === 0) {
-            victim.finalPercentage = (81 / totalCells) * 100.0; // Fallback for 9x9 initial base
-        }
+        if (victim.finalPercentage === 0) victim.finalPercentage = (81 / totalCells) * 100.0;
 
-        // Clear victim's territory and active trail
-        victim.trail.forEach(pt => {
-            this.trailGrid[pt.x][pt.y] = 0;
-        });
+        victim.trail.forEach(pt => { this.trailGrid[pt.x][pt.y] = 0; });
         victim.trail = [];
 
         for (let x = 0; x < GRID; x++) {
@@ -788,23 +1154,20 @@ class PaperIOGame {
             }
         }
 
-        // Live Feed Kill Toast Feedback
         let msg = "";
         if (attacker && attacker !== victim) {
             msg = `💀 <b>${attacker.name}</b> eliminated <b>${victim.name}</b> (${reason})`;
         } else if (victim === this.humanPlayer) {
             msg = `⚠️ <b>YOU DIED:</b> ${reason}`;
+            this.playSound('gameover');
         } else {
             msg = `💀 <b>${victim.name}</b> was eliminated (${reason})`;
         }
         this.addKillToast(msg);
 
-        // Schedule AI respawn after 6 seconds to keep map populated
         if (victim.isAI && !this.isGameOver) {
             setTimeout(() => {
-                if (!this.isGameOver && !victim.isAlive) {
-                    this.respawnAI(victim);
-                }
+                if (!this.isGameOver && !victim.isAlive) this.respawnAI(victim);
             }, 6000);
         }
     }
@@ -820,16 +1183,12 @@ class PaperIOGame {
         ai.trail = [];
         ai.isOutside = false;
         ai.isAlive = true;
-        ai.aiExcursion = 0;
 
-        // Spawn new 5x5 base
         for (let dx = -2; dx <= 2; dx++) {
             for (let dy = -2; dy <= 2; dy++) {
                 let tx = rx + dx;
                 let ty = ry + dy;
-                if (this.isValid(tx, ty)) {
-                    this.grid[tx][ty] = ai.id;
-                }
+                if (this.isValid(tx, ty)) this.grid[tx][ty] = ai.id;
             }
         }
         this.updateStats();
@@ -848,10 +1207,12 @@ class PaperIOGame {
         feed.appendChild(toast);
 
         setTimeout(() => {
-            if (toast && toast.parentNode) {
-                toast.parentNode.removeChild(toast);
-            }
+            if (toast && toast.parentNode) toast.parentNode.removeChild(toast);
         }, 3500);
+    }
+
+    calculateScore(p) {
+        return Math.floor((p.percentage * 500) + (p.kills * 250) + (p.coins * 10) + (this.elapsedSeconds * 5));
     }
 
     updateStats() {
@@ -865,29 +1226,29 @@ class PaperIOGame {
             }
             p.claimedCount = count;
             p.percentage = (count / totalCells) * 100.0;
-            if (p.percentage > p.maxPercentage) {
-                p.maxPercentage = p.percentage;
-            }
-            if (p.isAlive) {
-                p.finalPercentage = Math.max(p.percentage, p.maxPercentage);
-            }
+            if (p.percentage > p.maxPercentage) p.maxPercentage = p.percentage;
+            p.score = this.calculateScore(p);
         });
+
+        if (this.humanPlayer && this.humanPlayer.score >= 5000) {
+            this.triggerAchievement('high_scorer');
+        }
     }
 
     renderUI() {
-        // 1. Update Human Player Score Bar
         const pctFill = document.getElementById('playerPctFill');
         const pctText = document.getElementById('playerPctText');
         const killsText = document.getElementById('playerKillsText');
+        const scoreText = document.getElementById('playerScoreText');
 
         if (pctFill) pctFill.style.width = `${Math.min(100, this.humanPlayer.percentage)}%`;
         if (pctText) pctText.textContent = `🏆 ${this.humanPlayer.percentage.toFixed(2)} %`;
         if (killsText) killsText.textContent = `x${this.humanPlayer.kills}`;
+        if (scoreText) scoreText.textContent = `⭐ ${this.humanPlayer.score.toLocaleString()} PTS`;
 
-        // 2. Render Top Right Leaderboard
         const lbContainer = document.getElementById('leaderboardList');
         if (lbContainer) {
-            let sorted = [...this.players].sort((a, b) => b.percentage - a.percentage);
+            let sorted = [...this.players].sort((a, b) => b.score - a.score);
             let html = '';
             sorted.slice(0, 5).forEach((p, idx) => {
                 let isPlayer = (p.id === this.humanPlayer.id);
@@ -896,14 +1257,13 @@ class PaperIOGame {
                     <div class="${rankClass}">
                         <span class="lb-rank">#${idx + 1}</span>
                         <span class="lb-name" style="color: ${p.color};">${p.name}</span>
-                        <span class="lb-pct">${p.percentage.toFixed(2)}%</span>
+                        <span class="lb-pct">${p.score} PTS</span>
                     </div>
                 `;
             });
             lbContainer.innerHTML = html;
         }
 
-        // 3. Render Minimap Radar
         this.renderMinimap();
     }
 
@@ -927,7 +1287,6 @@ class PaperIOGame {
             }
         }
 
-        // Render player dots on radar
         this.players.forEach(p => {
             if (p.isAlive) {
                 mCtx.fillStyle = p.color;
@@ -949,152 +1308,280 @@ class PaperIOGame {
             this.isGameOver = true;
 
             let finalPct = Math.max(this.humanPlayer.percentage, this.humanPlayer.finalPercentage, this.humanPlayer.maxPercentage);
+            let finalScore = this.humanPlayer.score;
 
-            let sorted = [...this.players].sort((a, b) => {
-                let scoreA = Math.max(a.percentage, a.finalPercentage, a.maxPercentage);
-                let scoreB = Math.max(b.percentage, b.finalPercentage, b.maxPercentage);
-                return scoreB - scoreA;
-            });
+            let sorted = [...this.players].sort((a, b) => b.score - a.score);
             let winner = sorted[0].name;
+            let humanRank = sorted.findIndex(p => p.id === this.humanPlayer.id) + 1;
 
-            // Calculate coins earned: 50 coins per kill + territory bonus
-            let coinsEarned = (this.humanPlayer.kills * 50) + Math.max(10, Math.floor(finalPct * 10));
+            let coinsEarned = (this.humanPlayer.kills * 50) + Math.max(10, Math.floor(finalPct * 10)) + this.humanPlayer.coins;
             this.addCoins(coinsEarned);
 
-            this.saveMatchToJDBC(winner, sorted);
+            // Update Career Stats
+            this.stats.totalMatches++;
+            if (humanWon || humanRank === 1) {
+                this.stats.totalWins++;
+                this.triggerAchievement('first_win');
+            }
+            this.stats.totalKills += this.humanPlayer.kills;
+            this.stats.sumScores += finalScore;
+            this.stats.sumTerritories += finalPct;
+
+            let isNewHighScore = false;
+            if (finalScore > this.stats.bestScore) {
+                this.stats.bestScore = finalScore;
+                isNewHighScore = true;
+            }
+            if (finalPct > this.stats.bestTerritory) {
+                this.stats.bestTerritory = finalPct;
+            }
+            this.saveStatsData();
+
+            this.saveMatchRecord(winner, finalScore, finalPct, humanRank);
 
             const titleElem = document.getElementById('overlayTitle');
-            const subtitleElem = document.getElementById('overlaySubtitle');
+            const newHighElem = document.getElementById('newHighScoreBadge');
             const reasonElem = document.getElementById('overlayDeathReason');
 
+            const scoreStat = document.getElementById('overlayScoreStat');
             const pctStat = document.getElementById('overlayPctStat');
             const killsStat = document.getElementById('overlayKillsStat');
             const coinsStat = document.getElementById('overlayCoinsStat');
             const timeStat = document.getElementById('overlayTimeStat');
+            const rankStat = document.getElementById('overlayRankStat');
+            const bestScoreStat = document.getElementById('overlayBestScoreStat');
+            const bestPctStat = document.getElementById('overlayBestPctStat');
 
+            if (scoreStat) scoreStat.textContent = `${finalScore.toLocaleString()}`;
             if (pctStat) pctStat.textContent = `${finalPct.toFixed(2)}%`;
             if (killsStat) killsStat.textContent = `${this.humanPlayer.kills}`;
             if (coinsStat) coinsStat.textContent = `+${coinsEarned}`;
-            
+            if (rankStat) rankStat.textContent = `#${humanRank}`;
+            if (bestScoreStat) bestScoreStat.textContent = `${this.stats.bestScore.toLocaleString()}`;
+            if (bestPctStat) bestPctStat.textContent = `${this.stats.bestTerritory.toFixed(2)}%`;
+
             const mins = Math.floor(this.elapsedSeconds / 60);
             const secs = this.elapsedSeconds % 60;
             if (timeStat) timeStat.textContent = `${mins < 10 ? '0' : ''}${mins}:${secs < 10 ? '0' : ''}${secs}`;
 
+            if (isNewHighScore) {
+                if (newHighElem) newHighElem.classList.remove('hidden');
+                this.playSound('victory');
+            } else {
+                if (newHighElem) newHighElem.classList.add('hidden');
+            }
+
             if (humanWon) {
                 if (titleElem) { titleElem.textContent = "🏆 VICTORY!"; titleElem.style.color = "#10B981"; }
-                if (subtitleElem) subtitleElem.textContent = `You conquered ${finalPct.toFixed(2)}% of the arena & eliminated all rivals!`;
                 if (reasonElem) {
                     reasonElem.innerHTML = `🏆 <b>1st Place Winner!</b>`;
                     reasonElem.style.background = "rgba(16, 185, 129, 0.2)";
                     reasonElem.style.color = "#10B981";
                     reasonElem.style.borderColor = "#059669";
                 }
+                this.playSound('victory');
             } else {
                 if (titleElem) { titleElem.textContent = "GAME OVER"; titleElem.style.color = "#EF4444"; }
-                if (subtitleElem) subtitleElem.textContent = `Conquered ${finalPct.toFixed(2)}% of the arena`;
-
                 if (reasonElem) {
-                    let text = "";
-                    if (this.humanPlayer.killedBy) {
-                        text = `💀 Killed by <strong style="color: #F8FAFC; margin: 0 4px;">${this.humanPlayer.killedBy}</strong> (${this.humanPlayer.deathReason || 'Trail Cut'})`;
-                    } else if (this.humanPlayer.deathReason === "self-collision") {
-                        text = `⚠️ Ran into your own trail!`;
-                    } else if (this.humanPlayer.deathReason === "crashed into map border") {
-                        text = `🧱 Crashed into the map boundary!`;
-                    } else if (this.humanPlayer.deathReason === "head-to-head collision") {
-                        text = `💥 Head-to-head collision!`;
-                    } else {
-                        text = `💀 ${this.humanPlayer.deathReason || 'Eliminated'}`;
-                    }
+                    let text = this.humanPlayer.killedBy ? `💀 Killed by <b>${this.humanPlayer.killedBy}</b>` : `💀 ${this.humanPlayer.deathReason || 'Eliminated'}`;
                     reasonElem.innerHTML = text;
                     reasonElem.style.background = "rgba(239, 68, 68, 0.15)";
                     reasonElem.style.color = "#F87171";
-                    reasonElem.style.borderColor = "rgba(239, 68, 68, 0.4)";
                 }
             }
 
             let html = ``;
             sorted.forEach((p, idx) => {
-                let badge = !p.isAlive ? ` <span style="color:#94A3B8;font-size:0.8rem;">(Out)</span>` : '';
-                let score = Math.max(p.percentage, p.finalPercentage, p.maxPercentage);
-                html += `<div>#${idx + 1} ${p.name}${badge} - ${score.toFixed(2)}% (${p.kills} kills)</div>`;
+                let badge = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`;
+                html += `<div>${badge} <b>${p.name}</b> - ${p.score.toLocaleString()} PTS (${p.percentage.toFixed(2)}%)</div>`;
             });
             document.getElementById('overlayRankings').innerHTML = html;
             document.getElementById('gameOverlay').classList.remove('hidden');
         }
     }
 
-    addCoins(amount) {
-        const coinsElem = document.getElementById('coinsText');
-        let currentCoins = 12591;
-        if (coinsElem) {
-            let parsed = parseInt(coinsElem.textContent.replace(/,/g, ''), 10);
-            if (!isNaN(parsed)) currentCoins = parsed;
-            currentCoins += amount;
-            coinsElem.textContent = currentCoins.toLocaleString();
-        }
-    }
-
-    saveMatchToJDBC(winner, sorted) {
-        let matches = JSON.parse(localStorage.getItem('paper_io_matches') || '[]');
-        let finalPct = Math.max(this.humanPlayer.percentage, this.humanPlayer.finalPercentage, this.humanPlayer.maxPercentage);
+    saveMatchRecord(winner, score, pct, rank) {
+        let matches = JSON.parse(localStorage.getItem('tr_match_records') || '[]');
         matches.unshift({
             id: matches.length + 1,
-            time: new Date().toLocaleTimeString(),
-            winner: winner,
-            pct: finalPct,
+            player: this.humanPlayer.name,
+            score: score,
+            pct: pct,
             kills: this.humanPlayer.kills,
-            duration: this.elapsedSeconds
+            time: `${Math.floor(this.elapsedSeconds / 60)}m ${this.elapsedSeconds % 60}s`,
+            date: new Date().toLocaleDateString(),
+            rank: rank
         });
-        localStorage.setItem('paper_io_matches', JSON.stringify(matches.slice(0, 30)));
+        localStorage.setItem('tr_match_records', JSON.stringify(matches.slice(0, 20)));
     }
 
     openDBModal() {
-        let matches = JSON.parse(localStorage.getItem('paper_io_matches') || '[]');
+        let matches = JSON.parse(localStorage.getItem('tr_match_records') || '[]');
         if (matches.length === 0) {
             matches = [
-                { id: 1, time: "12:45:10 PM", winner: "Player", pct: 14.85, duration: 42 },
-                { id: 2, time: "01:12:34 PM", winner: "Dahlia", pct: 9.12, duration: 35 },
-                { id: 3, time: "01:30:00 PM", winner: "Player", pct: 22.40, duration: 58 }
+                { rank: 1, player: "Player", score: 4250, pct: 18.5, kills: 4, time: "2m 15s", date: "Today" },
+                { rank: 2, player: "Dahlia", score: 3100, pct: 14.2, kills: 2, time: "1m 45s", date: "Yesterday" }
             ];
-            localStorage.setItem('paper_io_matches', JSON.stringify(matches));
         }
 
         let body = document.getElementById('dbHistoryBody');
         body.innerHTML = '';
-        matches.slice(0, 10).forEach((m, idx) => {
-            let medal = idx === 0 ? '🥇 ' : idx === 1 ? '🥈 ' : idx === 2 ? '🥉 ' : `#${idx + 1} `;
+        matches.forEach((m) => {
+            let medal = m.rank === 1 ? '🥇' : m.rank === 2 ? '🥈' : m.rank === 3 ? '🥉' : `#${m.rank}`;
             body.innerHTML += `
                 <tr>
                     <td style="font-weight: 900; color: #38BDF8;">${medal}</td>
+                    <td><b>${m.player}</b></td>
+                    <td><span style="color:#FBBF24;font-weight:900;">${m.score.toLocaleString()}</span></td>
+                    <td><span style="color:#00E5FF;">${m.pct.toFixed(2)}%</span></td>
+                    <td>x${m.kills}</td>
                     <td>${m.time}</td>
-                    <td><b>${m.winner}</b></td>
-                    <td><span style="color:#00E5FF;font-weight:800;">${m.pct.toFixed(2)}%</span></td>
-                    <td>${m.duration}s</td>
+                    <td>${m.date}</td>
                 </tr>
             `;
         });
         document.getElementById('dbModal').classList.remove('hidden');
     }
 
-    claimDailyReward() {
-        this.addCoins(1000);
-        this.addKillToast(`🎁 <b>DAILY REWARD CLAIMED!</b> +1,000 Gold Coins added! 🎉`);
-        this.activateSpeedBoost(10);
+    // --- Skins Grid UI ---
+    renderSkinsGrid() {
+        const grid = document.getElementById('skinsGrid');
+        if (!grid) return;
+
+        let html = '';
+        this.availableSkins.forEach(s => {
+            let isSelected = s.id === this.selectedSkinId;
+            let cardClass = isSelected ? 'skin-card active' : 'skin-card';
+            let btnText = isSelected ? 'SELECTED ✓' : s.unlocked ? 'SELECT' : `UNLOCK (${s.price} 🪙)`;
+            let btnClass = isSelected ? 'btn-skin-action btn-secondary' : 'btn-skin-action';
+
+            html += `
+                <div class="${cardClass}">
+                    <div class="skin-swatch" style="background: ${s.color};"></div>
+                    <div class="skin-title">${s.name}</div>
+                    <div class="skin-status">${s.unlocked ? 'Unlocked' : `Requires ${s.price} 🪙`}</div>
+                    <button class="${btnClass}" onclick="window.gameInstance.handleSkinClick('${s.id}')">${btnText}</button>
+                </div>
+            `;
+        });
+        grid.innerHTML = html;
     }
 
-    activateSpeedBoost(seconds = 6) {
-        this.stepDelay = Math.max(35, Math.floor(this.baseStepDelay * 0.5));
-        this.addKillToast(`⚡ <b>SPEED SURGE ACTIVATED!</b> 2x Speed for ${seconds}s!`);
-        if (this.speedTimer) clearTimeout(this.speedTimer);
-        this.speedTimer = setTimeout(() => {
-            this.stepDelay = this.baseStepDelay;
-            this.addKillToast(`⏱️ Speed boost expired.`);
-        }, seconds * 1000);
+    handleSkinClick(skinId) {
+        const skin = this.availableSkins.find(s => s.id === skinId);
+        if (!skin) return;
+
+        if (skin.unlocked) {
+            this.selectedSkinId = skinId;
+            this.saveSkinsData();
+            this.playSound('click');
+        } else {
+            if (this.stats.totalCoins >= skin.price) {
+                this.stats.totalCoins -= skin.price;
+                skin.unlocked = true;
+                this.selectedSkinId = skinId;
+                this.saveSkinsData();
+                this.saveStatsData();
+                this.playSound('victory');
+                this.addKillToast(`🎨 <b>UNLOCKED ${skin.name.toUpperCase()} SKIN!</b> 🎉`);
+            } else {
+                this.playSound('gameover');
+                this.addKillToast(`⚠️ Need ${skin.price - this.stats.totalCoins} more Gold Coins!`);
+            }
+        }
+    }
+
+    updateSkinPreviewUI() {
+        const skin = this.availableSkins.find(s => s.id === this.selectedSkinId) || this.availableSkins[0];
+        const dot = document.getElementById('skinPreviewDot');
+        const name = document.getElementById('skinPreviewName');
+        if (dot) dot.style.background = skin.color;
+        if (name) name.textContent = skin.name;
+    }
+
+    // --- 7-Day Rewards & Streak System ---
+    openDailyRewardModal() {
+        const rewardData = [
+            { day: 1, text: '+100 🪙', claimed: true },
+            { day: 2, text: '+250 🪙', claimed: true },
+            { day: 3, text: '+500 🪙', claimed: false, active: true },
+            { day: 4, text: '⚡ + 750 🪙', claimed: false },
+            { day: 5, text: '+1,000 🪙', claimed: false },
+            { day: 6, text: '🛡️ + 1.5K 🪙', claimed: false },
+            { day: 7, text: '🎨 Gold Skin', claimed: false }
+        ];
+
+        const grid = document.getElementById('dailyStreakGrid');
+        if (grid) {
+            let html = '';
+            rewardData.forEach(r => {
+                let cls = r.claimed ? 'day-card claimed' : r.active ? 'day-card active' : 'day-card';
+                html += `
+                    <div class="${cls}">
+                        <span class="day-num">Day ${r.day}</span>
+                        <span class="day-reward-text">${r.text}</span>
+                        <span>${r.claimed ? 'Claimed ✓' : r.active ? 'READY!' : 'Locked'}</span>
+                    </div>
+                `;
+            });
+            grid.innerHTML = html;
+        }
+        document.getElementById('rewardModal').classList.remove('hidden');
+    }
+
+    claimDailyReward() {
+        this.addCoins(500);
+        this.playSound('victory');
+        this.addKillToast(`🎁 <b>DAILY STREAK REWARD CLAIMED!</b> +500 Gold Coins added! 🎉`);
+        document.getElementById('rewardModal').classList.add('hidden');
+    }
+
+    // --- Achievements & Career Stats Modals ---
+    renderAchievementsGrid() {
+        const grid = document.getElementById('achievementsGrid');
+        if (!grid) return;
+
+        let html = '';
+        this.achievements.forEach(a => {
+            let cls = a.unlocked ? 'achievement-card unlocked' : 'achievement-card';
+            html += `
+                <div class="${cls}">
+                    <span class="badge-icon">${a.icon}</span>
+                    <div class="achievement-info">
+                        <h4>${a.name} ${a.unlocked ? '✓' : ''}</h4>
+                        <p>${a.desc}</p>
+                    </div>
+                </div>
+            `;
+        });
+        grid.innerHTML = html;
+    }
+
+    renderStatsModal() {
+        const totalMatches = document.getElementById('statTotalMatches');
+        const totalWins = document.getElementById('statTotalWins');
+        const bestScore = document.getElementById('statBestScore');
+        const bestTerritory = document.getElementById('statBestTerritory');
+        const totalKills = document.getElementById('statTotalKills');
+        const totalCoins = document.getElementById('statTotalCoins');
+        const avgScore = document.getElementById('statAvgScore');
+        const avgTerritory = document.getElementById('statAvgTerritory');
+
+        if (totalMatches) totalMatches.textContent = this.stats.totalMatches;
+        if (totalWins) totalWins.textContent = this.stats.totalWins;
+        if (bestScore) bestScore.textContent = this.stats.bestScore.toLocaleString();
+        if (bestTerritory) bestTerritory.textContent = `${this.stats.bestTerritory.toFixed(2)}%`;
+        if (totalKills) totalKills.textContent = this.stats.totalKills;
+        if (totalCoins) totalCoins.textContent = this.stats.totalCoins.toLocaleString();
+
+        const avgS = this.stats.totalMatches > 0 ? Math.floor(this.stats.sumScores / this.stats.totalMatches) : 0;
+        const avgT = this.stats.totalMatches > 0 ? (this.stats.sumTerritories / this.stats.totalMatches).toFixed(2) : '0.00';
+
+        if (avgScore) avgScore.textContent = avgS.toLocaleString();
+        if (avgTerritory) avgTerritory.textContent = `${avgT}%`;
     }
 
     render() {
-        // Camera smooth follow centered on player cell
         let targetCamX = this.humanPlayer.x * CELL_SIZE + CELL_SIZE / 2;
         let targetCamY = this.humanPlayer.y * CELL_SIZE + CELL_SIZE / 2;
         this.cameraX += (targetCamX - this.cameraX) * 0.1;
@@ -1107,13 +1594,12 @@ class PaperIOGame {
         ctx.clearRect(0, 0, w, h);
 
         ctx.save();
-        // Camera Centering & Zoom Scale Transformation
         ctx.translate(w / 2, h / 2);
         ctx.scale(this.zoomScale, this.zoomScale);
         ctx.translate(-this.cameraX, -this.cameraY);
 
         // 1. Draw World Arena Grid Background
-        ctx.fillStyle = '#0F172A'; // Dark Gaming Arena Background
+        ctx.fillStyle = '#0F172A';
         ctx.fillRect(0, 0, MAP_SIZE, MAP_SIZE);
 
         ctx.strokeStyle = '#1E293B';
@@ -1131,7 +1617,6 @@ class PaperIOGame {
             ctx.stroke();
         }
 
-        // World Arena Outer Border Glow
         ctx.strokeStyle = '#38BDF8';
         ctx.lineWidth = 6;
         ctx.strokeRect(0, 0, MAP_SIZE, MAP_SIZE);
@@ -1167,13 +1652,45 @@ class PaperIOGame {
             }
         }
 
-        // 4. Render Player Square Heads & Nametags
+        // 4. Render Collectible Canvas Coins & Power-Ups
+        this.spawnedItems.forEach(item => {
+            let ix = item.x * CELL_SIZE + CELL_SIZE / 2;
+            let iy = item.y * CELL_SIZE + CELL_SIZE / 2;
+
+            ctx.save();
+            ctx.font = '20px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            if (item.type === 'coin') {
+                ctx.fillText('🪙', ix, iy);
+            } else if (item.type === 'speed') {
+                ctx.fillText('⚡', ix, iy);
+            } else if (item.type === 'shield') {
+                ctx.fillText('🛡️', ix, iy);
+            } else if (item.type === 'magnet') {
+                ctx.fillText('🧲', ix, iy);
+            } else if (item.type === 'dash') {
+                ctx.fillText('💨', ix, iy);
+            }
+            ctx.restore();
+        });
+
+        // 5. Render Player Heads, Shields & Nametags
         this.players.forEach(p => {
             if (p.isAlive) {
                 let px = p.x * CELL_SIZE;
                 let py = p.y * CELL_SIZE;
 
-                // Player Square Box
+                if (p.shieldActive) {
+                    ctx.strokeStyle = '#00E5FF';
+                    ctx.lineWidth = 3;
+                    ctx.shadowColor = '#00E5FF';
+                    ctx.shadowBlur = 12;
+                    ctx.strokeRect(px - 4, py - 4, CELL_SIZE + 8, CELL_SIZE + 8);
+                    ctx.shadowBlur = 0;
+                }
+
                 ctx.fillStyle = p.color;
                 ctx.shadowColor = p.color;
                 ctx.shadowBlur = 12;
@@ -1184,11 +1701,9 @@ class PaperIOGame {
                 ctx.lineWidth = 2;
                 ctx.strokeRect(px + 2, py + 2, CELL_SIZE - 4, CELL_SIZE - 4);
 
-                // Inner Eye Indicator Dot
                 ctx.fillStyle = '#FFFFFF';
                 ctx.fillRect(px + CELL_SIZE / 3, py + CELL_SIZE / 3, CELL_SIZE / 3, CELL_SIZE / 3);
 
-                // Nametag
                 ctx.fillStyle = '#FFFFFF';
                 ctx.font = 'bold 12px Outfit, sans-serif';
                 ctx.textAlign = 'center';
@@ -1200,7 +1715,6 @@ class PaperIOGame {
     }
 }
 
-// Initialize Game Engine on DOM Load
 window.addEventListener('DOMContentLoaded', () => {
-    window.gameInstance = new PaperIOGame();
+    window.gameInstance = new TerritoryRushGame();
 });

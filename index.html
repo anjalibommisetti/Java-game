@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Paper.io 2 - Web Edition</title>
-    <meta name="description" content="Paper.io 2 Official Web Clone - Capture territory, eliminate rivals, and conquer the leaderboard!">
+    <title>TERRITORY RUSH - Territory Conquest Game</title>
+    <meta name="description" content="TERRITORY RUSH - Conquer territory, collect power-ups, eliminate rivals, and dominate the global leaderboard!">
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,18 +16,21 @@
         <!-- Main Fullscreen Game Canvas -->
         <canvas id="gameCanvas"></canvas>
 
-        <!-- Top Left Score Badges & Profile -->
+        <!-- Top Left Score Badges & Profile HUD -->
         <div class="top-left-hud">
-            <div class="profile-pill">
+            <div class="profile-pill" id="profilePill" title="Click to view Profile & Statistics">
                 <span id="hudColorDot" class="color-dot" style="background: #00E5FF;"></span>
                 <span id="hudPlayerName" class="profile-name">Player</span>
-                <button id="btn-edit-profile" class="btn-edit-small" title="Edit Profile / Nickname">✏️ Edit</button>
+                <button id="btn-edit-profile" class="btn-edit-small" title="Edit Nickname">✏️ Edit</button>
             </div>
-            <div class="score-pill" title="Territory Captured %">
-                <div id="playerPctFill" class="score-fill" style="width: 0%;"></div>
-                <span id="playerPctText">🏆 0.00 %</span>
+            <div class="score-pill" title="Current Score">
+                <span id="playerScoreText">⭐ 0 PTS</span>
             </div>
             <div class="hud-stats-row">
+                <div class="territory-pill" title="Territory Captured %">
+                    <div id="playerPctFill" class="score-fill" style="width: 0%;"></div>
+                    <span id="playerPctText">🏆 0.00 %</span>
+                </div>
                 <div class="kills-pill" title="Rivals Eliminated">
                     <span class="skull-icon">💀</span>
                     <span id="playerKillsText">x0</span>
@@ -43,21 +46,28 @@
         <div class="top-right-hud">
             <div class="top-actions-row">
                 <div class="coins-badge" title="Total Gold Coins">
-                    <span id="coinsText">12,591</span>
+                    <span id="coinsText">0</span>
                     <span class="coin-icon">🪙</span>
                 </div>
                 <button id="btn-pause-hud" class="btn-pause" title="Pause Game (P)">⏸ PAUSE</button>
             </div>
             
+            <!-- Active Power-Up Status Container -->
+            <div id="activePowerupContainer" class="powerup-status-hud hidden">
+                <span id="powerupIcon" class="powerup-icon">⚡</span>
+                <span id="powerupName" class="powerup-name">Speed Boost</span>
+                <span id="powerupTimer" class="powerup-timer">6s</span>
+            </div>
+            
             <div class="zoom-controls">
-                <button id="btn-zoom-out" class="btn-zoom" title="Zoom Out (Wide Arena View)">🔍 -</button>
+                <button id="btn-zoom-out" class="btn-zoom" title="Zoom Out (Wide View)">🔍 -</button>
                 <input type="range" id="zoomSlider" min="30" max="150" value="90" class="zoom-slider" title="Zoom Level Slider">
                 <span id="zoomLabel" class="zoom-label">90%</span>
                 <button id="btn-zoom-in" class="btn-zoom" title="Zoom In">🔍 +</button>
             </div>
             
             <div id="leaderboardList" class="leaderboard-cards">
-                <!-- Dynamic Paper.io 2 Leaderboard Cards -->
+                <!-- Dynamic Territory Rush Leaderboard Cards -->
             </div>
         </div>
 
@@ -69,14 +79,13 @@
             </div>
         </div>
 
-        <!-- Bottom Right Feature & Rewards Controls -->
+        <!-- Bottom Right Quick Actions HUD -->
         <div class="bottom-right-hud">
-            <button id="btn-daily-reward" class="btn-demo" title="Claim Free Daily Reward Coins">🎁 Daily Reward</button>
-            <button id="btn-speed-boost" class="btn-demo" title="Activate Temporary Speed Boost">⚡ Speed Boost</button>
-            <button id="btn-db-modal" class="btn-demo-sec" title="View Saved Match Records & Leaderboard">📊 Match Records</button>
+            <button id="btn-hud-powerup" class="btn-demo" title="Dash Surge (Spacebar)">💨 Dash</button>
+            <button id="btn-db-modal" class="btn-demo-sec" title="Leaderboard">🏆 Ranks</button>
         </div>
 
-        <!-- Bottom Center On-Screen Controls for Touch / Mouse Click -->
+        <!-- Bottom Center On-Screen D-Pad Controls for Mobile / Touch -->
         <div class="bottom-center-hud">
             <div class="dpad">
                 <button id="btn-up" class="dpad-btn dpad-up" aria-label="Move Up">▲</button>
@@ -88,88 +97,83 @@
             </div>
         </div>
 
-        <!-- Landing / Start Game Overlay -->
+        <!-- Landing / Start Game Arcade Screen -->
         <div id="startOverlay" class="overlay">
             <div class="overlay-card start-card glass-panel">
                 <div class="game-logo">
-                    <h1 class="logo-title">PAPER.IO 2</h1>
-                    <span class="logo-badge">WEB EDITION</span>
+                    <h1 class="logo-title">TERRITORY RUSH</h1>
+                    <span class="logo-badge">TERRITORY CONQUEST GAME</span>
                 </div>
-                <p class="subtitle">Conquer territory, eliminate rivals, and claim #1 on the leaderboard!</p>
+                <p class="subtitle">Enclose territory, grab power-ups, defeat rivals, and claim the #1 high score!</p>
 
-                <!-- 2-Column Desktop Grid Wrapper -->
+                <!-- Profile Customization & Quick Actions Grid -->
                 <div class="start-content-grid">
-                    <!-- Profile Customization Section -->
+                    <!-- Profile Setup Section -->
                     <div class="profile-editor">
-                        <h3>👤 Player Profile</h3>
+                        <h3>👤 Player Setup</h3>
                         <div class="input-row">
                             <label for="playerNameInput">Nickname:</label>
                             <div class="name-input-wrapper">
-                                <input type="text" id="playerNameInput" placeholder="Enter Your Nickname" value="Player" maxlength="15" class="name-input" autocomplete="off">
+                                <input type="text" id="playerNameInput" placeholder="Enter Nickname" value="Player" maxlength="15" class="name-input" autocomplete="off">
                                 <button type="button" id="btn-clear-name" class="btn-clear" title="Clear Text">✕</button>
                             </div>
                         </div>
-                        <div id="nameValidationMsg" class="validation-msg hidden">⚠️ Please enter a nickname to start!</div>
+                        <div id="nameValidationMsg" class="validation-msg hidden">⚠️ Please enter a nickname!</div>
                         
                         <div class="input-row" style="margin-top: 10px;">
-                            <label>Skin Color:</label>
-                            <div class="color-options">
-                                <button type="button" class="color-btn active" data-color="#00E5FF" style="background: #00E5FF;" title="Cyan"></button>
-                                <button type="button" class="color-btn" data-color="#FF2D55" style="background: #FF2D55;" title="Neon Pink"></button>
-                                <button type="button" class="color-btn" data-color="#FFCC00" style="background: #FFCC00;" title="Gold Yellow"></button>
-                                <button type="button" class="color-btn" data-color="#00E676" style="background: #00E676;" title="Emerald Green"></button>
-                                <button type="button" class="color-btn" data-color="#AF52DE" style="background: #AF52DE;" title="Purple"></button>
+                            <label>Active Skin:</label>
+                            <div class="selected-skin-preview" id="currentSkinPreview">
+                                <span id="skinPreviewDot" class="color-dot" style="background: #00E5FF;"></span>
+                                <span id="skinPreviewName">Classic Cyan</span>
+                                <button type="button" id="btn-open-skins-quick" class="btn-skin-change">🎨 Change</button>
                             </div>
                         </div>
                         <div class="input-row" style="margin-top: 10px;">
                             <label>Game Speed:</label>
                             <div class="speed-options">
-                                <button type="button" class="speed-btn" data-speed="slow" title="Slow & Easy Mode (140ms)">🐢 Slow</button>
-                                <button type="button" class="speed-btn active" data-speed="normal" title="Normal Balanced Mode (95ms)">⚖️ Normal</button>
-                                <button type="button" class="speed-btn" data-speed="fast" title="Fast Challenge Mode (60ms)">⚡ Fast</button>
+                                <button type="button" class="speed-btn" data-speed="slow" title="Slow Mode (130ms)">🐢 Slow</button>
+                                <button type="button" class="speed-btn active" data-speed="normal" title="Normal Mode (95ms)">⚖️ Normal</button>
+                                <button type="button" class="speed-btn" data-speed="fast" title="Fast Mode (60ms)">⚡ Fast</button>
                             </div>
                         </div>
                         <div class="input-row" style="margin-top: 10px;">
                             <label>Steering:</label>
                             <div class="control-mode-options">
-                                <button type="button" class="ctrl-mode-btn active" data-mode="keyboard" title="Keyboard Keys & D-Pad (Recommended - No Mouse Interference)">⌨️ Keyboard</button>
-                                <button type="button" class="ctrl-mode-btn" data-mode="mouse" title="Mouse Pointer Steering">🖱️ Mouse Follow</button>
+                                <button type="button" class="ctrl-mode-btn active" data-mode="keyboard" title="Keyboard & D-Pad">⌨️ Keyboard</button>
+                                <button type="button" class="ctrl-mode-btn" data-mode="mouse" title="Mouse Follow">🖱️ Mouse</button>
                             </div>
                         </div>
                     </div>
 
-                    <!-- How To Play Instructions Section -->
-                    <div class="control-instructions">
-                        <h3>📖 How To Play</h3>
-                        <div class="rules-grid">
-                            <div class="rule-item">1. Venture outside your color base to draw a trail.</div>
-                            <div class="rule-item">2. Return safely to your base to enclose &amp; claim territory.</div>
-                            <div class="rule-item">3. Don't hit your own trail or let rivals cut your trail!</div>
-                            <div class="rule-item">4. Cut opponent trails to eliminate them &amp; gain kills.</div>
-                        </div>
-                        <div class="controls-legend">
-                            <span>⌨️ Controls: <b>WASD</b> / <b>Arrow Keys</b> | <b>P</b> to Pause</span>
+                    <!-- Main Arcade Navigation Buttons Grid -->
+                    <div class="menu-buttons-grid">
+                        <button id="btn-start-play" class="btn-play btn-cta pulse-animation">PLAY GAME NOW</button>
+                        <div class="arcade-buttons-row">
+                            <button id="btn-menu-skins" class="btn-arcade"><span class="btn-icon">🎨</span> Skins</button>
+                            <button id="btn-menu-leaderboard" class="btn-arcade"><span class="btn-icon">🏆</span> Leaderboard</button>
+                            <button id="btn-menu-stats" class="btn-arcade"><span class="btn-icon">📊</span> Statistics</button>
+                            <button id="btn-menu-achievements" class="btn-arcade"><span class="btn-icon">🏅</span> Badges</button>
+                            <button id="btn-menu-daily" class="btn-arcade"><span class="btn-icon">🎁</span> Rewards</button>
+                            <button id="btn-menu-howto" class="btn-arcade"><span class="btn-icon">📖</span> Tutorial</button>
+                            <button id="btn-menu-settings" class="btn-arcade"><span class="btn-icon">⚙️</span> Settings</button>
                         </div>
                     </div>
-                </div>
-
-                <div class="overlay-actions">
-                    <button id="btn-start-play" class="btn-play pulse-animation">PLAY GAME NOW</button>
                 </div>
             </div>
         </div>
 
-        <!-- Top Center Live Toast / Kill Feed Notifications -->
+        <!-- Top Center Live Toast / Feed Notifications -->
         <div id="killFeed" class="kill-feed"></div>
 
         <!-- Pause Menu Overlay -->
         <div id="pauseOverlay" class="overlay hidden">
             <div class="overlay-card pause-card glass-panel">
                 <h1 class="pause-title">⏸ GAME PAUSED</h1>
-                <p class="subtitle">Take a breather or restart your match</p>
+                <p class="subtitle">Match frozen. Choose an action below.</p>
                 <div class="pause-actions">
                     <button id="btn-resume-game" class="btn-play">▶ RESUME MATCH</button>
                     <button id="btn-restart-paused" class="btn-secondary">🔄 RESTART MATCH</button>
+                    <button id="btn-settings-paused" class="btn-secondary">⚙️ SETTINGS</button>
                     <button id="btn-main-menu-paused" class="btn-danger">🏠 MAIN MENU</button>
                 </div>
             </div>
@@ -178,12 +182,16 @@
         <!-- Game Over / Victory Screen Overlay -->
         <div id="gameOverlay" class="overlay hidden">
             <div class="overlay-card gameover-card glass-panel">
-                <h1 id="overlayTitle">YOU DIED</h1>
+                <h1 id="overlayTitle">GAME OVER</h1>
+                <div id="newHighScoreBadge" class="highscore-badge hidden">🏆 NEW HIGH SCORE!</div>
                 <div id="overlayDeathReason" class="death-reason-badge"></div>
-                <p id="overlaySubtitle">Conquered 0.00% of the arena</p>
                 
-                <!-- Match Summary Grid -->
+                <!-- Match Detailed Results Summary Grid -->
                 <div class="stats-summary-grid">
+                    <div class="stat-box">
+                        <span class="stat-label">Final Score</span>
+                        <span id="overlayScoreStat" class="stat-value highlight-score">0</span>
+                    </div>
                     <div class="stat-box">
                         <span class="stat-label">Territory</span>
                         <span id="overlayPctStat" class="stat-value">0.00%</span>
@@ -193,12 +201,24 @@
                         <span id="overlayKillsStat" class="stat-value">0</span>
                     </div>
                     <div class="stat-box">
-                        <span class="stat-label">Coins</span>
+                        <span class="stat-label">Coins Earned</span>
                         <span id="overlayCoinsStat" class="stat-value">+0</span>
                     </div>
                     <div class="stat-box">
-                        <span class="stat-label">Time</span>
+                        <span class="stat-label">Time Survived</span>
                         <span id="overlayTimeStat" class="stat-value">00:00</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label">Final Rank</span>
+                        <span id="overlayRankStat" class="stat-value">#1</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label">Best Score</span>
+                        <span id="overlayBestScoreStat" class="stat-value">0</span>
+                    </div>
+                    <div class="stat-box">
+                        <span class="stat-label">Best Territory</span>
+                        <span id="overlayBestPctStat" class="stat-value">0.00%</span>
                     </div>
                 </div>
 
@@ -206,45 +226,206 @@
                 
                 <div class="overlay-actions flex-actions">
                     <button id="btn-restart" class="btn-play">🎮 PLAY AGAIN</button>
+                    <button id="btn-gameover-leaderboard" class="btn-secondary">🏆 LEADERBOARD</button>
                     <button id="btn-main-menu-gameover" class="btn-secondary">🏠 MAIN MENU</button>
                 </div>
             </div>
         </div>
 
-        <!-- Daily Reward Gift Modal -->
-        <div id="rewardModal" class="modal hidden">
-            <div class="modal-card reward-card glass-panel">
-                <div class="gift-icon">🎁</div>
-                <h2 class="modal-title">Daily Gift Reward!</h2>
-                <p class="modal-sub">Claim your bonus reward for playing today:</p>
-                <div class="reward-box">
-                    <div>🪙 +1,000 GOLD COINS</div>
-                    <div class="reward-sub">⚡ 10s Speed Surge Boost</div>
+        <!-- 🎨 Skins Selection Modal -->
+        <div id="skinsModal" class="modal hidden">
+            <div class="modal-card skins-modal-card glass-panel">
+                <div class="modal-header">
+                    <h2>🎨 Skins Workshop</h2>
+                    <button class="btn-close close-modal-btn" data-target="skinsModal">&times;</button>
                 </div>
-                <button id="btn-claim-reward" class="btn-play btn-gold">CLAIM REWARD 🎉</button>
+                <div class="modal-body">
+                    <div class="skins-grid" id="skinsGrid">
+                        <!-- Dynamic Skins Cards -->
+                    </div>
+                </div>
             </div>
         </div>
 
-        <!-- JDBC & Match Records Leaderboard Modal -->
+        <!-- 🏆 Global Leaderboard Modal -->
         <div id="dbModal" class="modal hidden">
             <div class="modal-card leaderboard-modal-card glass-panel">
                 <div class="modal-header">
-                    <h2>🏆 Top Leaderboard &amp; Match Database</h2>
-                    <button id="btn-close-modal" class="btn-close" aria-label="Close Modal">&times;</button>
+                    <h2>🏆 Global Leaderboard & Match Records</h2>
+                    <button class="btn-close close-modal-btn" data-target="dbModal">&times;</button>
                 </div>
                 <div class="modal-body">
                     <table class="db-table">
                         <thead>
                             <tr>
                                 <th>Rank</th>
-                                <th>Timestamp</th>
-                                <th>Winner</th>
-                                <th>Territory %</th>
-                                <th>Duration</th>
+                                <th>Player</th>
+                                <th>Score</th>
+                                <th>Territory</th>
+                                <th>Kills</th>
+                                <th>Time</th>
+                                <th>Date</th>
                             </tr>
                         </thead>
                         <tbody id="dbHistoryBody"></tbody>
                     </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 📊 Player Statistics Modal -->
+        <div id="statsModal" class="modal hidden">
+            <div class="modal-card glass-panel">
+                <div class="modal-header">
+                    <h2>📊 Career Statistics</h2>
+                    <button class="btn-close close-modal-btn" data-target="statsModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="stats-overview-grid">
+                        <div class="stat-card-item">
+                            <span class="stat-card-num" id="statTotalMatches">0</span>
+                            <span class="stat-card-label">Total Matches</span>
+                        </div>
+                        <div class="stat-card-item">
+                            <span class="stat-card-num" id="statTotalWins">0</span>
+                            <span class="stat-card-label">Victories (#1)</span>
+                        </div>
+                        <div class="stat-card-item">
+                            <span class="stat-card-num" id="statBestScore">0</span>
+                            <span class="stat-card-label">Best Score</span>
+                        </div>
+                        <div class="stat-card-item">
+                            <span class="stat-card-num" id="statBestTerritory">0.00%</span>
+                            <span class="stat-card-label">Best Territory</span>
+                        </div>
+                        <div class="stat-card-item">
+                            <span class="stat-card-num" id="statTotalKills">0</span>
+                            <span class="stat-card-label">Total Kills</span>
+                        </div>
+                        <div class="stat-card-item">
+                            <span class="stat-card-num" id="statTotalCoins">0</span>
+                            <span class="stat-card-label">Total Coins</span>
+                        </div>
+                        <div class="stat-card-item">
+                            <span class="stat-card-num" id="statAvgScore">0</span>
+                            <span class="stat-card-label">Avg Score</span>
+                        </div>
+                        <div class="stat-card-item">
+                            <span class="stat-card-num" id="statAvgTerritory">0.00%</span>
+                            <span class="stat-card-label">Avg Territory</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 🏅 Achievements Badges Modal -->
+        <div id="achievementsModal" class="modal hidden">
+            <div class="modal-card glass-panel">
+                <div class="modal-header">
+                    <h2>🏅 Achievements & Trophies</h2>
+                    <button class="btn-close close-modal-btn" data-target="achievementsModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="achievements-grid" id="achievementsGrid">
+                        <!-- Dynamic Achievements Cards -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 🎁 7-Day Daily Reward System Modal -->
+        <div id="rewardModal" class="modal hidden">
+            <div class="modal-card reward-card glass-panel">
+                <div class="gift-icon">🎁</div>
+                <h2 class="modal-title">7-Day Login Rewards</h2>
+                <p class="modal-sub">Log in daily to claim bonus coins, power-ups & exclusive skins!</p>
+                <div class="daily-streak-grid" id="dailyStreakGrid">
+                    <!-- Dynamic 7-Day Cards -->
+                </div>
+                <button id="btn-claim-reward" class="btn-play btn-gold">CLAIM TODAY'S REWARD 🎉</button>
+            </div>
+        </div>
+
+        <!-- 📖 How To Play Tutorial Modal -->
+        <div id="howtoModal" class="modal hidden">
+            <div class="modal-card glass-panel">
+                <div class="modal-header">
+                    <h2>📖 How To Play Territory Rush</h2>
+                    <button class="btn-close close-modal-btn" data-target="howtoModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="tutorial-steps">
+                        <div class="step-card">
+                            <div class="step-num">1</div>
+                            <div class="step-text"><b>Draw Your Trail:</b> Move outside your colored base into unclaimed or opponent territory to draw an active trail.</div>
+                        </div>
+                        <div class="step-card">
+                            <div class="step-num">2</div>
+                            <div class="step-text"><b>Enclose & Capture:</b> Return safely back to your home base. All enclosed cells automatically convert to your territory!</div>
+                        </div>
+                        <div class="step-card">
+                            <div class="step-num">3</div>
+                            <div class="step-text"><b>Defend Your Trail:</b> If an opponent cuts your trail while you are outside, you are instantly eliminated! Do not run into your own trail.</div>
+                        </div>
+                        <div class="step-card">
+                            <div class="step-num">4</div>
+                            <div class="step-text"><b>Collect Power-Ups:</b> Grab ⚡ Speed Boost, 🛡️ Shield, 🧲 Magnet, and 🪙 Coins spawned around the map to dominate!</div>
+                        </div>
+                    </div>
+                    <div class="controls-legend" style="margin-top: 15px;">
+                        <span>⌨️ Controls: <b>WASD</b> / <b>Arrow Keys</b> | <b>Spacebar</b> to Dash | <b>P</b> to Pause</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ⚙️ Settings Menu Modal -->
+        <div id="settingsModal" class="modal hidden">
+            <div class="modal-card glass-panel">
+                <div class="modal-header">
+                    <h2>⚙️ Game Settings</h2>
+                    <button class="btn-close close-modal-btn" data-target="settingsModal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="settings-list">
+                        <div class="setting-item">
+                            <span>🔊 Sound Effects (SFX)</span>
+                            <button id="toggle-sfx" class="btn-toggle active">ON</button>
+                        </div>
+                        <div class="setting-item">
+                            <span>🎵 Game Music</span>
+                            <button id="toggle-music" class="btn-toggle active">ON</button>
+                        </div>
+                        <div class="setting-item">
+                            <span>📳 Mobile Vibration</span>
+                            <button id="toggle-vibe" class="btn-toggle active">ON</button>
+                        </div>
+                        <div class="setting-item">
+                            <span>🖥️ Graphics Quality</span>
+                            <div class="speed-options">
+                                <button type="button" class="gfx-btn active" data-gfx="high">High</button>
+                                <button type="button" class="gfx-btn" data-gfx="medium">Med</button>
+                                <button type="button" class="gfx-btn" data-gfx="low">Low</button>
+                            </div>
+                        </div>
+                        <div class="setting-item reset-row" style="margin-top: 15px;">
+                            <span>⚠️ Reset Game Progress</span>
+                            <button id="btn-reset-progress" class="btn-danger-small">Reset All Data</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ⚠️ Confirmation Modal for Progress Reset -->
+        <div id="confirmResetModal" class="modal hidden">
+            <div class="modal-card glass-panel text-center">
+                <h2 style="color: #EF4444;">⚠️ Reset All Progress?</h2>
+                <p class="subtitle" style="margin: 10px 0;">This will permanently wipe your unlocked skins, coins, high scores, and match stats. This action cannot be undone.</p>
+                <div class="overlay-actions flex-actions" style="margin-top: 15px;">
+                    <button id="btn-confirm-reset" class="btn-danger">YES, RESET EVERYTHING</button>
+                    <button id="btn-cancel-reset" class="btn-secondary">CANCEL</button>
                 </div>
             </div>
         </div>
