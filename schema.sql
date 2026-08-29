@@ -1,47 +1,54 @@
 -- ============================================================
 -- Paper Territory IO - MySQL Workbench Database Setup
--- Host: localhost | Port: 3306 | User: root | Password: Anjali@18
+-- Database: paper_territory
 -- ============================================================
 
--- Step 1: Create and select Database
 CREATE DATABASE IF NOT EXISTS paper_territory;
+
 USE paper_territory;
 
--- Step 2: Create Game Matches Table
+-- Step 1: Create Game Matches Table
 CREATE TABLE IF NOT EXISTS game_matches (
     match_id INT AUTO_INCREMENT PRIMARY KEY,
-    match_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    duration_seconds INT,
-    winner_name VARCHAR(100),
-    player_territory_pct DOUBLE,
-    total_players INT
+    played_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    winner_name VARCHAR(50) NOT NULL,
+    duration_seconds INT NOT NULL
 );
 
--- Step 3: Create Player Scores Table
+-- Step 2: Create Player Scores Table
 CREATE TABLE IF NOT EXISTS player_scores (
     score_id INT AUTO_INCREMENT PRIMARY KEY,
     match_id INT,
-    player_name VARCHAR(100),
-    is_ai TINYINT(1),
-    territory_pct DOUBLE,
-    claimed_cells INT,
-    rank_position INT,
-    eliminations INT,
-    FOREIGN KEY(match_id) REFERENCES game_matches(match_id) ON DELETE CASCADE
+    player_name VARCHAR(50) NOT NULL,
+    is_human BOOLEAN NOT NULL,
+    territory_pct DOUBLE NOT NULL,
+    kills INT NOT NULL,
+    final_rank INT NOT NULL,
+    FOREIGN KEY (match_id) REFERENCES game_matches(match_id) ON DELETE CASCADE
 );
 
 -- ============================================================
--- Sample / Test Queries for Workbench
+-- Helpful Queries to View Saved Data in MySQL Workbench
 -- ============================================================
 
--- View Leaderboard
-SELECT player_name, is_ai, territory_pct, claimed_cells, rank_position, eliminations 
+-- View Leaderboard Scores
+SELECT 
+    player_name, 
+    territory_pct, 
+    kills, 
+    final_rank 
 FROM player_scores 
-ORDER BY territory_pct DESC, claimed_cells DESC 
-LIMIT 10;
+ORDER BY territory_pct DESC;
 
--- View Match History
-SELECT match_id, match_timestamp, duration_seconds, winner_name, player_territory_pct, total_players 
-FROM game_matches 
-ORDER BY match_id DESC 
-LIMIT 10;
+-- View Full Match History
+SELECT 
+    m.match_id, 
+    m.played_at, 
+    m.winner_name, 
+    m.duration_seconds, 
+    s.player_name, 
+    s.territory_pct, 
+    s.kills 
+FROM game_matches m
+JOIN player_scores s ON m.match_id = s.match_id
+ORDER BY m.played_at DESC;

@@ -54,44 +54,38 @@ public class DatabaseManager {
         if (isMySQLActive) {
             createMatchesTable = "CREATE TABLE IF NOT EXISTS game_matches (" +
                     "match_id INT AUTO_INCREMENT PRIMARY KEY, " +
-                    "match_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
-                    "duration_seconds INT, " +
-                    "winner_name VARCHAR(100), " +
-                    "player_territory_pct DOUBLE, " +
-                    "total_players INT" +
+                    "played_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                    "winner_name VARCHAR(50) NOT NULL, " +
+                    "duration_seconds INT NOT NULL" +
                     ");";
 
             createPlayerScoresTable = "CREATE TABLE IF NOT EXISTS player_scores (" +
                     "score_id INT AUTO_INCREMENT PRIMARY KEY, " +
                     "match_id INT, " +
-                    "player_name VARCHAR(100), " +
-                    "is_ai TINYINT(1), " +
-                    "territory_pct DOUBLE, " +
-                    "claimed_cells INT, " +
-                    "rank_position INT, " +
-                    "eliminations INT, " +
-                    "FOREIGN KEY(match_id) REFERENCES game_matches(match_id) ON DELETE CASCADE" +
+                    "player_name VARCHAR(50) NOT NULL, " +
+                    "is_human BOOLEAN NOT NULL, " +
+                    "territory_pct DOUBLE NOT NULL, " +
+                    "kills INT NOT NULL, " +
+                    "final_rank INT NOT NULL, " +
+                    "FOREIGN KEY (match_id) REFERENCES game_matches(match_id) ON DELETE CASCADE" +
                     ");";
         } else {
             createMatchesTable = "CREATE TABLE IF NOT EXISTS game_matches (" +
                     "match_id INTEGER PRIMARY KEY AUTOINCREMENT, " +
-                    "match_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
-                    "duration_seconds INTEGER, " +
-                    "winner_name TEXT, " +
-                    "player_territory_pct REAL, " +
-                    "total_players INTEGER" +
+                    "played_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                    "winner_name TEXT NOT NULL, " +
+                    "duration_seconds INTEGER NOT NULL" +
                     ");";
 
             createPlayerScoresTable = "CREATE TABLE IF NOT EXISTS player_scores (" +
                     "score_id INTEGER PRIMARY KEY AUTOINCREMENT, " +
                     "match_id INTEGER, " +
-                    "player_name TEXT, " +
-                    "is_ai INTEGER, " +
-                    "territory_pct REAL, " +
-                    "claimed_cells INTEGER, " +
-                    "rank_position INTEGER, " +
-                    "eliminations INTEGER, " +
-                    "FOREIGN KEY(match_id) REFERENCES game_matches(match_id) ON DELETE CASCADE" +
+                    "player_name TEXT NOT NULL, " +
+                    "is_human INTEGER NOT NULL, " +
+                    "territory_pct REAL NOT NULL, " +
+                    "kills INTEGER NOT NULL, " +
+                    "final_rank INTEGER NOT NULL, " +
+                    "FOREIGN KEY (match_id) REFERENCES game_matches(match_id) ON DELETE CASCADE" +
                     ");";
         }
 
@@ -106,26 +100,16 @@ public class DatabaseManager {
     }
 
     public synchronized boolean saveMatchResults(int durationSec, String winnerName, List<Player> rankedPlayers) {
-        String insertMatchSql = "INSERT INTO game_matches (duration_seconds, winner_name, player_territory_pct, total_players) VALUES (?, ?, ?, ?)";
-        String insertScoreSql = "INSERT INTO player_scores (match_id, player_name, is_ai, territory_pct, claimed_cells, rank_position, eliminations) VALUES (?, ?, ?, ?, ?, ?, ?)";
-
-        double humanPct = 0.0;
-        for (Player p : rankedPlayers) {
-            if (!p.isAI()) {
-                humanPct = p.getTerritoryPercentage();
-                break;
-            }
-        }
+        String insertMatchSql = "INSERT INTO game_matches (winner_name, duration_seconds) VALUES (?, ?)";
+        String insertScoreSql = "INSERT INTO player_scores (match_id, player_name, is_human, territory_pct, kills, final_rank) VALUES (?, ?, ?, ?, ?, ?)";
 
         try (Connection conn = getConnection()) {
             conn.setAutoCommit(false);
 
             int matchId = -1;
             try (PreparedStatement pstmtMatch = conn.prepareStatement(insertMatchSql, Statement.RETURN_GENERATED_KEYS)) {
-                pstmtMatch.setInt(1, durationSec);
-                pstmtMatch.setString(2, winnerName);
-                pstmtMatch.setDouble(3, humanPct);
-                pstmtMatch.setInt(4, rankedPlayers.size());
+                pstmtMatch.setString(1, winnerName);
+                pstmtMatch.setInt(2, durationSec);
                 pstmtMatch.executeUpdate();
 
                 try (ResultSet rs = pstmtMatch.getGeneratedKeys()) {
@@ -141,11 +125,10 @@ public class DatabaseManager {
                         Player p = rankedPlayers.get(i);
                         pstmtScore.setInt(1, matchId);
                         pstmtScore.setString(2, p.getName());
-                        pstmtScore.setInt(3, p.isAI() ? 1 : 0);
+                        pstmtScore.setBoolean(3, !p.isAI());
                         pstmtScore.setDouble(4, p.getTerritoryPercentage());
-                        pstmtScore.setInt(5, p.getClaimedCount());
+                        pstmtScore.setInt(5, p.getKillCount());
                         pstmtScore.setInt(6, i + 1);
-                        pstmtScore.setInt(7, p.getKillCount());
                         pstmtScore.addBatch();
                     }
                     pstmtScore.executeBatch();
@@ -163,8 +146,8 @@ public class DatabaseManager {
 
     public List<Map<String, Object>> getLeaderboard(int limit) {
         List<Map<String, Object>> list = new ArrayList<>();
-        String sql = "SELECT player_name, is_ai, territory_pct, claimed_cells, rank_position, eliminations " +
-                     "FROM player_scores ORDER BY territory_pct DESC, claimed_cells DESC LIMIT ?";
+        String sql = "SELECT player_name, is_human, territory_pct, kills, final_rank " +
+                     "FROM player_scores ORDER BY territory_pct DESC, kills DESC LIMIT ?";
 
         try (Connection conn = getConnection();
              PreparedStatement pstmt = conn.prepareStatement(sql)) {
@@ -173,11 +156,10 @@ public class DatabaseManager {
                 while (rs.next()) {
                     Map<String, Object> map = new HashMap<>();
                     map.put("player_name", rs.getString("player_name"));
-                    map.put("is_ai", rs.getInt("is_ai") == 1);
+                    map.put("is_human", rs.getBoolean("is_human"));
                     map.put("territory_pct", rs.getDouble("territory_pct"));
-                    map.put("claimed_cells", rs.getInt("claimed_cells"));
-                    map.put("rank_position", rs.getInt("rank_position"));
-                    map.put("eliminations", rs.getInt("eliminations"));
+                    map.put("kills", rs.getInt("kills"));
+                    map.put("final_rank", rs.getInt("final_rank"));
                     list.add(map);
                 }
             }
@@ -189,7 +171,7 @@ public class DatabaseManager {
 
     public List<Map<String, Object>> getMatchHistory(int limit) {
         List<Map<String, Object>> list = new ArrayList<>();
-        String sql = "SELECT match_id, match_timestamp, duration_seconds, winner_name, player_territory_pct, total_players " +
+        String sql = "SELECT match_id, played_at, winner_name, duration_seconds " +
                      "FROM game_matches ORDER BY match_id DESC LIMIT ?";
 
         try (Connection conn = getConnection();
@@ -199,11 +181,9 @@ public class DatabaseManager {
                 while (rs.next()) {
                     Map<String, Object> map = new HashMap<>();
                     map.put("match_id", rs.getInt("match_id"));
-                    map.put("match_timestamp", rs.getString("match_timestamp"));
-                    map.put("duration_seconds", rs.getInt("duration_seconds"));
+                    map.put("played_at", rs.getString("played_at"));
                     map.put("winner_name", rs.getString("winner_name"));
-                    map.put("player_territory_pct", rs.getDouble("player_territory_pct"));
-                    map.put("total_players", rs.getInt("total_players"));
+                    map.put("duration_seconds", rs.getInt("duration_seconds"));
                     list.add(map);
                 }
             }
