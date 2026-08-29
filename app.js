@@ -78,6 +78,9 @@ class TerritoryRushGame {
 
         // Sound Effects Synthesizer Context
         this.audioCtx = null;
+        this.musicStepIndex = 0;
+        this.lastMusicBeatTime = 0;
+        this.setupAudioListeners();
 
         // Load Persistent Settings & Skins & Stats
         this.loadSettings();
@@ -99,13 +102,22 @@ class TerritoryRushGame {
     }
 
     // --- Web Audio API Procedural Sound Synthesizer ---
+    setupAudioListeners() {
+        const unlock = () => {
+            this.initAudio();
+        };
+        ['click', 'pointerdown', 'touchstart', 'keydown'].forEach(evt => {
+            window.addEventListener(evt, unlock, { passive: true });
+        });
+    }
+
     initAudio() {
         if (!this.audioCtx) {
             const AudioCtxClass = window.AudioContext || window.webkitAudioContext;
             if (AudioCtxClass) this.audioCtx = new AudioCtxClass();
         }
         if (this.audioCtx && this.audioCtx.state === 'suspended') {
-            this.audioCtx.resume();
+            this.audioCtx.resume().catch(() => {});
         }
     }
 
@@ -127,16 +139,32 @@ class TerritoryRushGame {
                 osc.type = 'sine';
                 osc.frequency.setValueAtTime(600, now);
                 osc.frequency.exponentialRampToValueAtTime(300, now + 0.05);
-                gain.gain.setValueAtTime(0.15, now);
+                gain.gain.setValueAtTime(0.2, now);
                 gain.gain.linearRampToValueAtTime(0.01, now + 0.05);
                 osc.start(now);
                 osc.stop(now + 0.05);
+            } else if (type === 'trail') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(320, now);
+                osc.frequency.linearRampToValueAtTime(440, now + 0.04);
+                gain.gain.setValueAtTime(0.06, now);
+                gain.gain.linearRampToValueAtTime(0.001, now + 0.04);
+                osc.start(now);
+                osc.stop(now + 0.04);
+            } else if (type === 'dash') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(200, now);
+                osc.frequency.exponentialRampToValueAtTime(800, now + 0.15);
+                gain.gain.setValueAtTime(0.25, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.15);
+                osc.start(now);
+                osc.stop(now + 0.15);
             } else if (type === 'capture') {
                 osc.type = 'triangle';
                 osc.frequency.setValueAtTime(440, now);
                 osc.frequency.setValueAtTime(554.37, now + 0.08); // C#
                 osc.frequency.setValueAtTime(659.25, now + 0.16); // E
-                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.setValueAtTime(0.25, now);
                 gain.gain.linearRampToValueAtTime(0.01, now + 0.25);
                 osc.start(now);
                 osc.stop(now + 0.25);
@@ -144,7 +172,7 @@ class TerritoryRushGame {
                 osc.type = 'sine';
                 osc.frequency.setValueAtTime(987.77, now); // B5
                 osc.frequency.setValueAtTime(1318.51, now + 0.06); // E6
-                gain.gain.setValueAtTime(0.25, now);
+                gain.gain.setValueAtTime(0.3, now);
                 gain.gain.linearRampToValueAtTime(0.01, now + 0.18);
                 osc.start(now);
                 osc.stop(now + 0.18);
@@ -152,7 +180,7 @@ class TerritoryRushGame {
                 osc.type = 'sawtooth';
                 osc.frequency.setValueAtTime(300, now);
                 osc.frequency.exponentialRampToValueAtTime(900, now + 0.2);
-                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.setValueAtTime(0.25, now);
                 gain.gain.linearRampToValueAtTime(0.01, now + 0.25);
                 osc.start(now);
                 osc.stop(now + 0.25);
@@ -160,7 +188,7 @@ class TerritoryRushGame {
                 osc.type = 'square';
                 osc.frequency.setValueAtTime(800, now);
                 osc.frequency.exponentialRampToValueAtTime(200, now + 0.15);
-                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.setValueAtTime(0.35, now);
                 gain.gain.linearRampToValueAtTime(0.01, now + 0.2);
                 osc.start(now);
                 osc.stop(now + 0.2);
@@ -168,7 +196,7 @@ class TerritoryRushGame {
                 osc.type = 'square';
                 osc.frequency.setValueAtTime(250, now);
                 osc.frequency.exponentialRampToValueAtTime(80, now + 0.2);
-                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.setValueAtTime(0.35, now);
                 gain.gain.linearRampToValueAtTime(0.01, now + 0.22);
                 osc.start(now);
                 osc.stop(now + 0.22);
@@ -178,7 +206,7 @@ class TerritoryRushGame {
                 osc.frequency.setValueAtTime(659.25, now + 0.1); // E5
                 osc.frequency.setValueAtTime(783.99, now + 0.2); // G5
                 osc.frequency.setValueAtTime(1046.50, now + 0.3); // C6
-                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.setValueAtTime(0.35, now);
                 gain.gain.linearRampToValueAtTime(0.01, now + 0.5);
                 osc.start(now);
                 osc.stop(now + 0.5);
@@ -186,7 +214,7 @@ class TerritoryRushGame {
                 osc.type = 'sawtooth';
                 osc.frequency.setValueAtTime(400, now);
                 osc.frequency.exponentialRampToValueAtTime(100, now + 0.4);
-                gain.gain.setValueAtTime(0.25, now);
+                gain.gain.setValueAtTime(0.3, now);
                 gain.gain.linearRampToValueAtTime(0.01, now + 0.45);
                 osc.start(now);
                 osc.stop(now + 0.45);
@@ -194,6 +222,33 @@ class TerritoryRushGame {
         } catch (e) {
             // Audio context fallback safeguard
         }
+    }
+
+    playBackgroundArcadeBeat(now) {
+        if (!this.settings.music || !this.gameStarted || this.isPaused || this.isGameOver) return;
+        if (now - this.lastMusicBeatTime < 320) return;
+        this.lastMusicBeatTime = now;
+        this.initAudio();
+        if (!this.audioCtx) return;
+
+        try {
+            const notes = [261.63, 329.63, 392.00, 523.25, 392.00, 329.63]; // C4, E4, G4, C5, G4, E4
+            const freq = notes[this.musicStepIndex % notes.length];
+            this.musicStepIndex++;
+
+            const ctx = this.audioCtx;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(freq, ctx.currentTime);
+            gain.gain.setValueAtTime(0.04, ctx.currentTime);
+            gain.gain.linearRampToValueAtTime(0.001, ctx.currentTime + 0.25);
+
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(ctx.currentTime);
+            osc.stop(ctx.currentTime + 0.25);
+        } catch (e) {}
     }
 
     // --- Settings & Storage Handlers ---
@@ -846,6 +901,8 @@ class TerritoryRushGame {
         const delta = now - this.lastStepTime;
 
         if (this.gameStarted && !this.isPaused && !this.isGameOver) {
+            this.playBackgroundArcadeBeat(now);
+
             if (now - this.lastTimerTick >= 1000) {
                 this.elapsedSeconds++;
                 this.lastTimerTick = now;
@@ -1044,6 +1101,7 @@ class TerritoryRushGame {
 
         if (currentOwner !== p.id) {
             p.isOutside = true;
+            if (p === this.humanPlayer) this.playSound('trail');
 
             if (this.trailGrid[nx][ny] === p.id) {
                 p.deathReason = "self-collision";
