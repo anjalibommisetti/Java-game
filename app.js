@@ -1502,39 +1502,105 @@ class TerritoryRushGame {
 
     // --- 7-Day Rewards & Streak System ---
     openDailyRewardModal() {
+        const todayStr = new Date().toDateString();
+        const lastClaim = localStorage.getItem('tr_last_daily_claim');
+        const isAlreadyClaimed = (lastClaim === todayStr);
+
+        let currentStreak = parseInt(localStorage.getItem('tr_daily_streak') || '1', 10);
+        if (isNaN(currentStreak) || currentStreak < 1 || currentStreak > 7) currentStreak = 1;
+
         const rewardData = [
-            { day: 1, text: '+100 🪙', claimed: true },
-            { day: 2, text: '+250 🪙', claimed: true },
-            { day: 3, text: '+500 🪙', claimed: false, active: true },
-            { day: 4, text: '⚡ + 750 🪙', claimed: false },
-            { day: 5, text: '+1,000 🪙', claimed: false },
-            { day: 6, text: '🛡️ + 1.5K 🪙', claimed: false },
-            { day: 7, text: '🎨 Gold Skin', claimed: false }
+            { day: 1, text: '+100 🪙', amount: 100 },
+            { day: 2, text: '+250 🪙', amount: 250 },
+            { day: 3, text: '+500 🪙', amount: 500 },
+            { day: 4, text: '⚡ + 750 🪙', amount: 750 },
+            { day: 5, text: '+1,000 🪙', amount: 1000 },
+            { day: 6, text: '🛡️ + 1.5K 🪙', amount: 1500 },
+            { day: 7, text: '🎨 + 3.0K 🪙', amount: 3000 }
         ];
 
         const grid = document.getElementById('dailyStreakGrid');
         if (grid) {
             let html = '';
             rewardData.forEach(r => {
-                let cls = r.claimed ? 'day-card claimed' : r.active ? 'day-card active' : 'day-card';
+                let isClaimed = (r.day < currentStreak) || (r.day === currentStreak && isAlreadyClaimed);
+                let isActive = (r.day === currentStreak && !isAlreadyClaimed);
+                let cls = isClaimed ? 'day-card claimed' : isActive ? 'day-card active' : 'day-card';
+                let statusText = isClaimed ? 'Claimed ✓' : isActive ? 'READY!' : 'Locked';
+
                 html += `
                     <div class="${cls}">
                         <span class="day-num">Day ${r.day}</span>
                         <span class="day-reward-text">${r.text}</span>
-                        <span>${r.claimed ? 'Claimed ✓' : r.active ? 'READY!' : 'Locked'}</span>
+                        <span>${statusText}</span>
                     </div>
                 `;
             });
             grid.innerHTML = html;
         }
+
+        const claimBtn = document.getElementById('btn-claim-reward');
+        if (claimBtn) {
+            if (isAlreadyClaimed) {
+                claimBtn.textContent = "ALREADY CLAIMED TODAY ✓";
+                claimBtn.disabled = true;
+                claimBtn.style.opacity = "0.5";
+                claimBtn.style.cursor = "not-allowed";
+            } else {
+                let activeReward = rewardData[(currentStreak - 1) % 7];
+                claimBtn.textContent = `CLAIM DAY ${currentStreak} REWARD (${activeReward.text}) 🎉`;
+                claimBtn.disabled = false;
+                claimBtn.style.opacity = "1";
+                claimBtn.style.cursor = "pointer";
+            }
+        }
+
         document.getElementById('rewardModal').classList.remove('hidden');
     }
 
     claimDailyReward() {
-        this.addCoins(500);
+        const todayStr = new Date().toDateString();
+        const lastClaim = localStorage.getItem('tr_last_daily_claim');
+
+        if (lastClaim === todayStr) {
+            this.playSound('gameover');
+            this.addKillToast(`⚠️ <b>ALREADY CLAIMED TODAY!</b> Come back tomorrow for your next reward!`);
+            document.getElementById('rewardModal').classList.add('hidden');
+            return;
+        }
+
+        let currentStreak = parseInt(localStorage.getItem('tr_daily_streak') || '1', 10);
+        if (isNaN(currentStreak) || currentStreak < 1 || currentStreak > 7) currentStreak = 1;
+
+        const rewardData = [
+            { day: 1, amount: 100 },
+            { day: 2, amount: 250 },
+            { day: 3, amount: 500 },
+            { day: 4, amount: 750 },
+            { day: 5, amount: 1000 },
+            { day: 6, amount: 1500 },
+            { day: 7, amount: 3000 }
+        ];
+
+        let reward = rewardData[(currentStreak - 1) % 7];
+        this.addCoins(reward.amount);
+
+        // Record today's claim date
+        localStorage.setItem('tr_last_daily_claim', todayStr);
+
+        // Advance streak for tomorrow (1 through 7, wraps back to 1)
+        let nextStreak = (currentStreak % 7) + 1;
+        localStorage.setItem('tr_daily_streak', nextStreak.toString());
+
         this.playSound('victory');
-        this.addKillToast(`🎁 <b>DAILY STREAK REWARD CLAIMED!</b> +500 Gold Coins added! 🎉`);
-        document.getElementById('rewardModal').classList.add('hidden');
+        this.addKillToast(`🎁 <b>DAY ${currentStreak} REWARD CLAIMED!</b> +${reward.amount} Gold Coins added! 🎉`);
+
+        // Refresh modal UI to show "ALREADY CLAIMED TODAY" status
+        this.openDailyRewardModal();
+
+        setTimeout(() => {
+            document.getElementById('rewardModal').classList.add('hidden');
+        }, 1500);
     }
 
     // --- Achievements & Career Stats Modals ---
