@@ -717,6 +717,7 @@ class TerritoryRushGame {
         const validationMsg = document.getElementById('nameValidationMsg');
 
         if (nameInput) {
+            if (nameInput.value.trim() && validationMsg) validationMsg.classList.add('hidden');
             nameInput.addEventListener('input', (e) => {
                 nameInput.classList.remove('input-error');
                 if (validationMsg) validationMsg.classList.add('hidden');
