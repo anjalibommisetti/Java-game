@@ -9,48 +9,97 @@ import java.util.List;
 import java.util.Map;
 
 public class DatabaseManager {
-    private static final String DB_URL = "jdbc:sqlite:paper_territory.db";
+    // MySQL Database credentials
+    private static final String MYSQL_URL = "jdbc:mysql://localhost:3306/paper_territory?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC";
+    private static final String MYSQL_USER = "root";
+    private static final String MYSQL_PASS = "Anjali@18";
+
+    // SQLite Fallback
+    private static final String SQLITE_URL = "jdbc:sqlite:paper_territory.db";
+
+    private boolean isMySQLActive = false;
 
     public DatabaseManager() {
+        // First attempt to connect to MySQL
         try {
-            Class.forName("org.sqlite.JDBC");
-            initTables();
+            Class.forName("com.mysql.cj.jdbc.Driver");
+            try (Connection conn = DriverManager.getConnection(MYSQL_URL, MYSQL_USER, MYSQL_PASS)) {
+                isMySQLActive = true;
+                System.out.println("✅ Connected to MySQL Database (localhost:3306/paper_territory) as root!");
+            }
         } catch (Throwable e) {
-            System.err.println("JDBC Database Init Warning: " + e.getMessage());
+            System.out.println("⚠️ Could not connect to MySQL (" + e.getMessage() + "). Falling back to SQLite database.");
+            try {
+                Class.forName("org.sqlite.JDBC");
+            } catch (Throwable ex) {
+                System.err.println("SQLite JDBC Driver Error: " + ex.getMessage());
+            }
         }
+
+        initTables();
     }
 
     private Connection getConnection() throws SQLException {
-        return DriverManager.getConnection(DB_URL);
+        if (isMySQLActive) {
+            return DriverManager.getConnection(MYSQL_URL, MYSQL_USER, MYSQL_PASS);
+        } else {
+            return DriverManager.getConnection(SQLITE_URL);
+        }
     }
 
     private void initTables() {
-        String createMatchesTable = "CREATE TABLE IF NOT EXISTS game_matches (" +
-                "match_id INTEGER PRIMARY KEY AUTOINCREMENT, " +
-                "match_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
-                "duration_seconds INTEGER, " +
-                "winner_name TEXT, " +
-                "player_territory_pct REAL, " +
-                "total_players INTEGER" +
-                ");";
+        String createMatchesTable;
+        String createPlayerScoresTable;
 
-        String createPlayerScoresTable = "CREATE TABLE IF NOT EXISTS player_scores (" +
-                "score_id INTEGER PRIMARY KEY AUTOINCREMENT, " +
-                "match_id INTEGER, " +
-                "player_name TEXT, " +
-                "is_ai INTEGER, " +
-                "territory_pct REAL, " +
-                "claimed_cells INTEGER, " +
-                "rank_position INTEGER, " +
-                "eliminations INTEGER, " +
-                "FOREIGN KEY(match_id) REFERENCES game_matches(match_id) ON DELETE CASCADE" +
-                ");";
+        if (isMySQLActive) {
+            createMatchesTable = "CREATE TABLE IF NOT EXISTS game_matches (" +
+                    "match_id INT AUTO_INCREMENT PRIMARY KEY, " +
+                    "match_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                    "duration_seconds INT, " +
+                    "winner_name VARCHAR(100), " +
+                    "player_territory_pct DOUBLE, " +
+                    "total_players INT" +
+                    ");";
+
+            createPlayerScoresTable = "CREATE TABLE IF NOT EXISTS player_scores (" +
+                    "score_id INT AUTO_INCREMENT PRIMARY KEY, " +
+                    "match_id INT, " +
+                    "player_name VARCHAR(100), " +
+                    "is_ai TINYINT(1), " +
+                    "territory_pct DOUBLE, " +
+                    "claimed_cells INT, " +
+                    "rank_position INT, " +
+                    "eliminations INT, " +
+                    "FOREIGN KEY(match_id) REFERENCES game_matches(match_id) ON DELETE CASCADE" +
+                    ");";
+        } else {
+            createMatchesTable = "CREATE TABLE IF NOT EXISTS game_matches (" +
+                    "match_id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                    "match_timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP, " +
+                    "duration_seconds INTEGER, " +
+                    "winner_name TEXT, " +
+                    "player_territory_pct REAL, " +
+                    "total_players INTEGER" +
+                    ");";
+
+            createPlayerScoresTable = "CREATE TABLE IF NOT EXISTS player_scores (" +
+                    "score_id INTEGER PRIMARY KEY AUTOINCREMENT, " +
+                    "match_id INTEGER, " +
+                    "player_name TEXT, " +
+                    "is_ai INTEGER, " +
+                    "territory_pct REAL, " +
+                    "claimed_cells INTEGER, " +
+                    "rank_position INTEGER, " +
+                    "eliminations INTEGER, " +
+                    "FOREIGN KEY(match_id) REFERENCES game_matches(match_id) ON DELETE CASCADE" +
+                    ");";
+        }
 
         try (Connection conn = getConnection();
              Statement stmt = conn.createStatement()) {
             stmt.execute(createMatchesTable);
             stmt.execute(createPlayerScoresTable);
-            System.out.println("SQLite JDBC Tables Initialized Successfully.");
+            System.out.println("Database Tables Initialized Successfully (" + (isMySQLActive ? "MySQL" : "SQLite") + ").");
         } catch (SQLException e) {
             System.err.println("Failed to initialize database tables: " + e.getMessage());
         }
@@ -104,7 +153,7 @@ public class DatabaseManager {
             }
 
             conn.commit();
-            System.out.println("Match results saved to SQLite JDBC database! (Match ID: " + matchId + ")");
+            System.out.println("Match results saved to " + (isMySQLActive ? "MySQL" : "SQLite") + " database! (Match ID: " + matchId + ")");
             return true;
         } catch (SQLException e) {
             System.err.println("JDBC Error saving match results: " + e.getMessage());
