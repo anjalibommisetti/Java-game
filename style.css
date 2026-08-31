@@ -1505,3 +1505,72 @@ body, html {
     .dpad-btn { width: 34px; height: 34px; font-size: 0.85rem; }
 }
 
+/* 🔥 Dynamic Arcade Combo Announcement Banner Styles */
+.combo-banner-container {
+    position: absolute;
+    top: 25%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+    z-index: 60;
+    pointer-events: none;
+}
+
+.combo-banner {
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.95), rgba(2, 132, 199, 0.95));
+    border: 2px solid #00E5FF;
+    box-shadow: 0 0 35px rgba(0, 229, 255, 0.6), 0 10px 40px rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(16px);
+    padding: 12px 28px;
+    border-radius: 24px;
+    color: #FFFFFF;
+    font-size: 1.6rem;
+    font-weight: 900;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    text-shadow: 0 0 12px rgba(0, 229, 255, 0.8), 0 3px 6px rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    animation: comboPopBounce 2.4s forwards cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.combo-banner.mega-capture {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.95), rgba(234, 179, 8, 0.95));
+    border-color: #FACC15;
+    box-shadow: 0 0 35px rgba(250, 204, 21, 0.7), 0 10px 40px rgba(0, 0, 0, 0.6);
+    color: #FFF;
+}
+
+.combo-banner.multi-kill {
+    background: linear-gradient(135deg, rgba(225, 29, 72, 0.95), rgba(244, 63, 94, 0.95));
+    border-color: #FF2D55;
+    box-shadow: 0 0 35px rgba(255, 45, 85, 0.7), 0 10px 40px rgba(0, 0, 0, 0.6);
+    color: #FFF;
+}
+
+.combo-banner.freeze-wave {
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.95), rgba(56, 189, 248, 0.95));
+    border-color: #38BDF8;
+    box-shadow: 0 0 35px rgba(56, 189, 248, 0.7), 0 10px 40px rgba(0, 0, 0, 0.6);
+    color: #FFF;
+}
+
+.combo-banner.king-hill {
+    background: linear-gradient(135deg, rgba(168, 85, 247, 0.95), rgba(192, 132, 252, 0.95));
+    border-color: #E040FB;
+    box-shadow: 0 0 35px rgba(224, 64, 251, 0.7), 0 10px 40px rgba(0, 0, 0, 0.6);
+    color: #FFF;
+}
+
+@keyframes comboPopBounce {
+    0% { opacity: 0; transform: scale(0.3) translateY(40px) rotate(-5deg); }
+    15% { opacity: 1; transform: scale(1.15) translateY(0) rotate(2deg); }
+    25% { transform: scale(1) translateY(0) rotate(0deg); }
+    75% { opacity: 1; transform: scale(1) translateY(0); }
+    100% { opacity: 0; transform: scale(0.8) translateY(-30px); }
+}
+

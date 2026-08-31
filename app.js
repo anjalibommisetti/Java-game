@@ -38,6 +38,8 @@ class Player {
         this.magnetTimer = null;
         this.speedBoostActive = false;
         this.speedBoostTimer = null;
+        this.isFrozen = false;
+        this.freezeTimer = null;
 
         // AI behavior fields
         this.aiTarget = null;
@@ -62,6 +64,9 @@ class TerritoryRushGame {
         this.players = [];
         this.humanPlayer = null;
         this.spawnedItems = []; // Collectible Coins & Power-Ups on canvas
+        this.particles = []; // Particle FX Engine
+        this.killStreak = 0;
+        this.killStreakResetTimer = null;
 
         this.cameraX = 0;
         this.cameraY = 0;
@@ -215,6 +220,25 @@ class TerritoryRushGame {
                 osc.frequency.setValueAtTime(400, now);
                 osc.frequency.exponentialRampToValueAtTime(100, now + 0.4);
                 gain.gain.setValueAtTime(0.3, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.45);
+                osc.start(now);
+                osc.stop(now + 0.45);
+            } else if (type === 'freeze') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(880, now);
+                osc.frequency.setValueAtTime(1200, now + 0.08);
+                osc.frequency.setValueAtTime(1760, now + 0.16);
+                gain.gain.setValueAtTime(0.3, now);
+                gain.gain.linearRampToValueAtTime(0.01, now + 0.35);
+                osc.start(now);
+                osc.stop(now + 0.35);
+            } else if (type === 'megacapture') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(523.25, now); // C5
+                osc.frequency.setValueAtTime(659.25, now + 0.08); // E5
+                osc.frequency.setValueAtTime(783.99, now + 0.16); // G5
+                osc.frequency.setValueAtTime(1046.50, now + 0.24); // C6
+                gain.gain.setValueAtTime(0.35, now);
                 gain.gain.linearRampToValueAtTime(0.01, now + 0.45);
                 osc.start(now);
                 osc.stop(now + 0.45);
@@ -551,12 +575,46 @@ class TerritoryRushGame {
 
     // --- Collectible Canvas Power-Ups & Items Generator ---
     spawnMapItems(count = 3) {
-        const types = ['coin', 'coin', 'coin', 'speed', 'shield', 'magnet', 'dash'];
+        const types = ['coin', 'coin', 'coin', 'speed', 'shield', 'magnet', 'dash', 'freeze'];
         for (let i = 0; i < count; i++) {
             let rx = 10 + Math.floor(Math.random() * (GRID - 20));
             let ry = 10 + Math.floor(Math.random() * (GRID - 20));
             let type = types[Math.floor(Math.random() * types.length)];
             this.spawnedItems.push({ x: rx, y: ry, type: type, id: Math.random() });
+        }
+    }
+
+    showComboBanner(icon, text, bannerClass = '') {
+        const container = document.getElementById('comboBannerContainer');
+        if (!container) return;
+
+        const banner = document.createElement('div');
+        banner.className = `combo-banner ${bannerClass}`;
+        banner.innerHTML = `<span>${icon}</span> <span>${text}</span>`;
+        container.appendChild(banner);
+
+        setTimeout(() => {
+            if (banner && banner.parentNode) banner.parentNode.removeChild(banner);
+        }, 2400);
+    }
+
+    spawnParticles(cellX, cellY, color, count = 15, speed = 4) {
+        const worldX = (cellX + 0.5) * CELL_SIZE;
+        const worldY = (cellY + 0.5) * CELL_SIZE;
+        for (let i = 0; i < count; i++) {
+            const angle = Math.random() * Math.PI * 2;
+            const velocity = (Math.random() * 0.7 + 0.3) * speed;
+            this.particles.push({
+                x: worldX,
+                y: worldY,
+                vx: Math.cos(angle) * velocity,
+                vy: Math.sin(angle) * velocity,
+                size: Math.random() * 5 + 3,
+                color: color,
+                alpha: 1.0,
+                life: 1.0,
+                decay: Math.random() * 0.03 + 0.02
+            });
         }
     }
 
@@ -566,12 +624,15 @@ class TerritoryRushGame {
             p.coins += amount;
             this.addCoins(amount);
             this.playSound('coin');
+            this.spawnParticles(p.x, p.y, '#FBBF24', 12, 3);
             this.addKillToast(`🪙 <b>+${amount} Gold Coins Collected!</b>`);
         } else if (type === 'speed') {
             p.speedBoostActive = true;
             this.stepDelay = Math.max(35, Math.floor(this.baseStepDelay * 0.5));
             this.showPowerupHUD('⚡', 'Speed Boost', 6);
             this.playSound('powerup');
+            this.spawnParticles(p.x, p.y, '#00E5FF', 15, 4);
+            this.showComboBanner('⚡', 'SPEED DASH SURGE!', '');
             this.addKillToast(`⚡ <b>SPEED BOOST ACTIVATED!</b> (6s)`);
 
             if (p.speedBoostTimer) clearTimeout(p.speedBoostTimer);
@@ -584,6 +645,8 @@ class TerritoryRushGame {
             p.shieldActive = true;
             this.showPowerupHUD('🛡️', 'Shield Invincibility', 6);
             this.playSound('powerup');
+            this.spawnParticles(p.x, p.y, '#3B82F6', 15, 4);
+            this.showComboBanner('🛡️', 'SHIELD INVINCIBLE!', '');
             this.addKillToast(`🛡️ <b>SHIELD ACTIVATED!</b> Protected from cut! (6s)`);
 
             if (p.shieldTimer) clearTimeout(p.shieldTimer);
@@ -595,6 +658,8 @@ class TerritoryRushGame {
             p.magnetActive = true;
             this.showPowerupHUD('🧲', 'Coin Magnet', 8);
             this.playSound('powerup');
+            this.spawnParticles(p.x, p.y, '#EC4899', 15, 4);
+            this.showComboBanner('🧲', 'COIN MAGNET ACTIVE!', '');
             this.addKillToast(`🧲 <b>COIN MAGNET ACTIVATED!</b> (8s)`);
 
             if (p.magnetTimer) clearTimeout(p.magnetTimer);
@@ -602,6 +667,22 @@ class TerritoryRushGame {
                 p.magnetActive = false;
                 this.hidePowerupHUD();
             }, 8000);
+        } else if (type === 'freeze') {
+            this.playSound('freeze');
+            this.showPowerupHUD('❄️', 'Freeze Wave', 5);
+            this.showComboBanner('❄️', 'FREEZE WAVE ACTIVATED!', 'freeze-wave');
+            this.addKillToast(`❄️ <b>FREEZE WAVE!</b> Rivals frozen in place! (5s)`);
+
+            this.players.filter(other => other.isAI && other.isAlive).forEach(ai => {
+                ai.isFrozen = true;
+                ai.vx = 0;
+                ai.vy = 0;
+                this.spawnParticles(ai.x, ai.y, '#38BDF8', 20, 4);
+                if (ai.freezeTimer) clearTimeout(ai.freezeTimer);
+                ai.freezeTimer = setTimeout(() => {
+                    ai.isFrozen = false;
+                }, 5000);
+            });
         } else if (type === 'dash') {
             this.performDash(p);
         }
@@ -943,20 +1024,41 @@ class TerritoryRushGame {
             this.movePlayer(this.humanPlayer);
         }
 
-        // 2. AI Movement Logic
+        // 2. AI Movement Logic (Skipped if frozen by Freeze Wave)
         this.players.filter(p => p.isAI && p.isAlive).forEach(ai => {
+            if (ai.isFrozen) return;
             this.updateAIMovement(ai);
             this.movePlayer(ai);
         });
 
-        // 3. Collectible Item Pickups & Magnet Effect
+        // 3. Golden Crown Center Zone Score Multiplier Check
+        if (this.humanPlayer && this.humanPlayer.isAlive) {
+            if (this.humanPlayer.x >= 64 && this.humanPlayer.x <= 76 && this.humanPlayer.y >= 64 && this.humanPlayer.y <= 76) {
+                this.humanPlayer.score += 25;
+                if (Math.random() < 0.4) this.spawnParticles(this.humanPlayer.x, this.humanPlayer.y, '#FACC15', 3, 2);
+            }
+        }
+
+        // 4. Collectible Item Pickups & Magnet Effect
         this.checkItemPickups();
 
-        // 4. Collisions & Game Over Evaluation
+        // 5. Update Particle FX
+        this.updateParticles();
+
+        // 6. Collisions & Game Over Evaluation
         this.checkCollisions();
         this.updateStats();
         this.renderUI();
         this.checkGameOver();
+    }
+
+    updateParticles() {
+        this.particles.forEach(p => {
+            p.x += p.vx;
+            p.y += p.vy;
+            p.alpha -= p.decay;
+        });
+        this.particles = this.particles.filter(p => p.alpha > 0);
     }
 
     checkItemPickups() {
@@ -1166,9 +1268,14 @@ class TerritoryRushGame {
         }
 
         this.updateStats();
-        let gainedPct = (p.percentage - prevPct).toFixed(2);
+        let gainedPct = parseFloat((p.percentage - prevPct).toFixed(2));
         if (p === this.humanPlayer) {
-            if (gainedPct > 0.1) {
+            this.spawnParticles(p.x, p.y, p.color, 18, 5);
+            if (gainedPct >= 5.0) {
+                this.playSound('megacapture');
+                this.showComboBanner('💥', `MEGA CAPTURE! +${gainedPct}%`, 'mega-capture');
+                this.addKillToast(`💥 <b>MEGA CAPTURE! +${gainedPct}% Territory!</b>`);
+            } else if (gainedPct > 0.1) {
                 this.playSound('capture');
                 this.addKillToast(`✨ <b>Captured +${gainedPct}% Territory!</b>`);
             }
@@ -1191,6 +1298,22 @@ class TerritoryRushGame {
         victim.isAlive = false;
         victim.vx = 0;
         victim.vy = 0;
+
+        this.spawnParticles(victim.x, victim.y, victim.color, 28, 6);
+
+        if (attacker === this.humanPlayer && attacker !== victim) {
+            this.killStreak++;
+            if (this.killStreakResetTimer) clearTimeout(this.killStreakResetTimer);
+            this.killStreakResetTimer = setTimeout(() => { this.killStreak = 0; }, 8000);
+
+            if (this.killStreak === 2) {
+                this.showComboBanner('💀💀', 'DOUBLE KILL!', 'multi-kill');
+            } else if (this.killStreak === 3) {
+                this.showComboBanner('💀💀💀', 'TRIPLE KILL!', 'multi-kill');
+            } else if (this.killStreak >= 4) {
+                this.showComboBanner('👑', 'UNSTOPPABLE RAMPAGE!', 'multi-kill');
+            }
+        }
 
         let totalCells = GRID * GRID;
         let count = 0;
@@ -1746,7 +1869,30 @@ class TerritoryRushGame {
         ctx.lineWidth = 6;
         ctx.strokeRect(0, 0, MAP_SIZE, MAP_SIZE);
 
-        // 2. Draw Territory Claims
+        // 2. Draw Golden Crown Center Zone (King of the Hill)
+        const crownX = 64 * CELL_SIZE;
+        const crownY = 64 * CELL_SIZE;
+        const crownW = 12 * CELL_SIZE;
+        const crownH = 12 * CELL_SIZE;
+
+        ctx.fillStyle = 'rgba(250, 204, 21, 0.08)';
+        ctx.fillRect(crownX, crownY, crownW, crownH);
+
+        ctx.strokeStyle = '#FACC15';
+        ctx.lineWidth = 3;
+        ctx.shadowColor = '#FACC15';
+        ctx.shadowBlur = 15;
+        ctx.strokeRect(crownX, crownY, crownW, crownH);
+        ctx.shadowBlur = 0;
+
+        ctx.save();
+        ctx.font = '28px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('👑', crownX + crownW / 2, crownY + crownH / 2);
+        ctx.restore();
+
+        // 3. Draw Territory Claims
         for (let x = 0; x < GRID; x++) {
             for (let y = 0; y < GRID; y++) {
                 let owner = this.grid[x][y];
@@ -1760,7 +1906,7 @@ class TerritoryRushGame {
             }
         }
 
-        // 3. Draw Active Glowing Player Trails
+        // 4. Draw Active Glowing Player Trails
         for (let x = 0; x < GRID; x++) {
             for (let y = 0; y < GRID; y++) {
                 let trailOwner = this.trailGrid[x][y];
@@ -1777,7 +1923,7 @@ class TerritoryRushGame {
             }
         }
 
-        // 4. Render Collectible Canvas Coins & Power-Ups
+        // 5. Render Collectible Canvas Coins & Power-Ups
         this.spawnedItems.forEach(item => {
             let ix = item.x * CELL_SIZE + CELL_SIZE / 2;
             let iy = item.y * CELL_SIZE + CELL_SIZE / 2;
@@ -1797,11 +1943,26 @@ class TerritoryRushGame {
                 ctx.fillText('🧲', ix, iy);
             } else if (item.type === 'dash') {
                 ctx.fillText('💨', ix, iy);
+            } else if (item.type === 'freeze') {
+                ctx.fillText('❄️', ix, iy);
             }
             ctx.restore();
         });
 
-        // 5. Render Player Heads, Shields & Nametags
+        // 6. Render Explosive Particle FX
+        this.particles.forEach(pt => {
+            ctx.save();
+            ctx.globalAlpha = Math.max(0, pt.alpha);
+            ctx.fillStyle = pt.color;
+            ctx.shadowColor = pt.color;
+            ctx.shadowBlur = 10;
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y, pt.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        });
+
+        // 7. Render Player Heads, Shields, Frozen Ice & Nametags
         this.players.forEach(p => {
             if (p.isAlive) {
                 let px = p.x * CELL_SIZE;
@@ -1814,6 +1975,20 @@ class TerritoryRushGame {
                     ctx.shadowBlur = 12;
                     ctx.strokeRect(px - 4, py - 4, CELL_SIZE + 8, CELL_SIZE + 8);
                     ctx.shadowBlur = 0;
+                }
+
+                if (p.isFrozen) {
+                    ctx.strokeStyle = '#38BDF8';
+                    ctx.lineWidth = 4;
+                    ctx.shadowColor = '#38BDF8';
+                    ctx.shadowBlur = 16;
+                    ctx.strokeRect(px - 6, py - 6, CELL_SIZE + 12, CELL_SIZE + 12);
+                    ctx.shadowBlur = 0;
+
+                    ctx.save();
+                    ctx.font = '16px sans-serif';
+                    ctx.fillText('❄️', px + CELL_SIZE / 2, py - 18);
+                    ctx.restore();
                 }
 
                 ctx.fillStyle = p.color;
