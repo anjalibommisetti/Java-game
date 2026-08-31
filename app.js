@@ -1509,11 +1509,16 @@ class TerritoryRushGame {
             this.stats.sumScores += finalScore;
             this.stats.sumTerritories += finalPct;
 
+            let prevBest = this.stats.bestScore;
             let isNewHighScore = false;
-            if (finalScore > this.stats.bestScore) {
+            if (finalScore > prevBest && prevBest > 0) {
                 this.stats.bestScore = finalScore;
                 isNewHighScore = true;
+            } else if (prevBest === 0) {
+                this.stats.bestScore = finalScore;
+                if (humanWon || finalScore >= 1200) isNewHighScore = true;
             }
+
             if (finalPct > this.stats.bestTerritory) {
                 this.stats.bestTerritory = finalPct;
             }
@@ -1575,7 +1580,8 @@ class TerritoryRushGame {
             let html = ``;
             sorted.forEach((p, idx) => {
                 let badge = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`;
-                html += `<div>${badge} <b>${p.name}</b> - ${p.score.toLocaleString()} PTS (${p.percentage.toFixed(2)}%)</div>`;
+                let displayPct = Math.max(p.percentage, p.finalPercentage || 0, p.maxPercentage || 0);
+                html += `<div>${badge} <b>${p.name}</b> - ${p.score.toLocaleString()} PTS (${displayPct.toFixed(2)}%)</div>`;
             });
             document.getElementById('overlayRankings').innerHTML = html;
             document.getElementById('gameOverlay').classList.remove('hidden');
@@ -1689,6 +1695,18 @@ class TerritoryRushGame {
 
         let currentStreak = parseInt(localStorage.getItem('tr_daily_streak') || '1', 10);
         if (isNaN(currentStreak) || currentStreak < 1 || currentStreak > 7) currentStreak = 1;
+
+        // Reset streak to Day 1 if a day was skipped
+        if (lastClaim && !isAlreadyClaimed) {
+            const lastDate = new Date(lastClaim);
+            const todayDate = new Date(todayStr);
+            const diffTime = Math.abs(todayDate - lastDate);
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            if (diffDays > 1) {
+                currentStreak = 1;
+                localStorage.setItem('tr_daily_streak', '1');
+            }
+        }
 
         const rewardData = [
             { day: 1, text: '+100 🪙', amount: 100 },
